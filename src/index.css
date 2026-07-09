@@ -25,6 +25,10 @@
     @apply bg-surface text-ink font-sans antialiased;
     margin: 0;
     overscroll-behavior: none;
+    /* Respect device notches / rounded corners on mobile (0 on web/desktop). */
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   /* Accessibility helpers toggled from Settings. */

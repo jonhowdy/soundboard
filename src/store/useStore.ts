@@ -13,6 +13,8 @@ import { storage } from '../db/database';
 import { audioEngine, AudioEngine } from '../audio/AudioEngine';
 import type { Pcm } from '../audio/edit';
 import { encodeWav } from '../utils/wav';
+import { hapticTap } from '../platform/haptics';
+import { syncStatusBar } from '../platform/native';
 import { applyTheme } from '../themes/themes';
 import { buildSeed } from '../data/seed';
 import {
@@ -162,7 +164,7 @@ export const useStore = create<State>((set, get) => ({
       };
       void storage.putSound(next);
       set((st) => ({ sounds: st.sounds.map((s) => (s.id === id ? next : s)) }));
-      if (get().settings.haptics && 'vibrate' in navigator) navigator.vibrate(15);
+      if (get().settings.haptics) hapticTap();
     };
 
     if (!audioEngine.isLoaded(id)) {
@@ -365,7 +367,10 @@ export const useStore = create<State>((set, get) => ({
   updateSettings: (patch) => {
     const settings = { ...get().settings, ...patch };
     void storage.putSettings(settings);
-    if (patch.theme) applyTheme(patch.theme);
+    if (patch.theme) {
+      applyTheme(patch.theme);
+      void syncStatusBar(patch.theme);
+    }
     if (patch.masterVolume !== undefined)
       audioEngine.setMasterVolume(patch.masterVolume);
     if (patch.outputDeviceId !== undefined)

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from './store/useStore';
 import { audioEngine } from './audio/AudioEngine';
 import { useHotkeys } from './hooks/useHotkeys';
-import { isTauri } from './platform';
+import { isTauri, isCapacitor } from './platform';
 import { syncGlobalHotkeys, clearGlobalHotkeys } from './platform/globalHotkeys';
+import { initNative } from './platform/native';
 import { isSupportedAudioFile } from './utils/audioFiles';
 import { TopBar } from './components/TopBar';
 import { CategoryBar } from './components/CategoryBar';
@@ -27,9 +28,27 @@ export function App() {
 
   useHotkeys();
 
+  // Android back button: close whatever is open (or stop sounds) before exiting.
+  const backRef = useRef<() => boolean>(() => false);
+  backRef.current = () => {
+    const st = useStore.getState();
+    if (st.editingSoundId) return st.setEditingSound(null), true;
+    if (record) return setRecord(false), true;
+    if (settings) return setSettings(false), true;
+    if (stats) return setStats(false), true;
+    if (st.activeVoices.length) return st.stopAll(), true;
+    return false;
+  };
+
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Mobile (Capacitor): status-bar styling + hardware back-button handling.
+  useEffect(() => {
+    if (!isCapacitor()) return;
+    void initNative(useStore.getState().settings.theme, () => backRef.current());
+  }, []);
 
   // Desktop: mirror sound hotkeys into OS-level global shortcuts and keep them
   // in sync as sounds are added/edited/removed.

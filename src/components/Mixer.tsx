@@ -14,7 +14,10 @@ export function Mixer() {
   if (voices.length === 0) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center p-3">
+    <div
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center p-3"
+      style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+    >
       <div className="glass pointer-events-auto w-full max-w-lg rounded-xl2 p-3 shadow-2xl">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm font-semibold">

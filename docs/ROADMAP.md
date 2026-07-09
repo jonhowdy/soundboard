@@ -48,10 +48,20 @@ download it.*
 `tauri-action` on release tags, add `.ico`/`.icns`, system-tray + auto-launch,
 and a native low-latency output path if WebView `setSinkId` proves insufficient.
 
-## 🔜 M5 — Mobile (Capacitor)
-iOS + Android shells over the same bundle. Native haptics, background audio,
-share-sheet import, Files/Photos access, landscape/portrait, swipe-between-pages,
-SQLite storage plugin. TestFlight + Play internal testing.
+## 🟡 M5 — Mobile (Capacitor) *(core done)*
+**Done:** Capacitor shell (`capacitor.config.ts`) wrapping the same `dist/`;
+platform detection (`isCapacitor`/`getPlatform`), **native haptics** on play with
+web fallback, theme-aware **status bar**, Android hardware **back button**
+handling, and **safe-area insets** for notched devices. All native plugins are
+lazy-loaded so the web bundle is unaffected. `npm run mobile:ios|android` scripts
+and `docs/MOBILE.md` cover setup and store submission.
+*Web integration browser-verified (native detection reports web off-device;
+haptics/status-bar no-op safely). Compiling `.ipa`/`.aab` needs Xcode/Android
+Studio.*
+
+**Remaining:** native **SQLite** storage plugin for very large libraries,
+background audio, share-sheet / Files import, landscape polish, swipe-between-
+pages (ships with multi-page), TestFlight + Play internal testing.
 
 ## 🔜 M6 — Backup & resilience
 Automatic daily local backups with version history + one-tap restore. ZIP and CSV
