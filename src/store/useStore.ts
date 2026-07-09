@@ -49,6 +49,17 @@ interface State {
   stopAll: () => void;
   playRandom: (scope: RandomScope) => void;
 
+  // queue
+  queue: string[];
+  queuePlaying: boolean;
+  queueIndex: number;
+  addToQueue: (id: string) => void;
+  removeFromQueue: (index: number) => void;
+  moveInQueue: (index: number, dir: -1 | 1) => void;
+  clearQueue: () => void;
+  playQueue: () => void;
+  stopQueue: () => void;
+
   // CRUD
   importFiles: (files: FileList | File[]) => Promise<void>;
   addRecording: (blob: Blob, title: string) => Promise<void>;
@@ -175,7 +186,66 @@ export const useStore = create<State>((set, get) => ({
   },
 
   stopSound: (id) => audioEngine.stopSound(id),
-  stopAll: () => audioEngine.stopAll(),
+  stopAll: () => {
+    get().stopQueue();
+    audioEngine.stopAll();
+  },
+
+  queue: [],
+  queuePlaying: false,
+  queueIndex: 0,
+
+  addToQueue: (id) => set((st) => ({ queue: [...st.queue, id] })),
+  removeFromQueue: (index) =>
+    set((st) => ({ queue: st.queue.filter((_, i) => i !== index) })),
+  moveInQueue: (index, dir) =>
+    set((st) => ({ queue: moveItem(st.queue, index, index + dir) })),
+  clearQueue: () => {
+    get().stopQueue();
+    set({ queue: [] });
+  },
+
+  playQueue: () => {
+    const { queue } = get();
+    if (queue.length === 0) return;
+    audioEngine.unlock();
+    set({ queuePlaying: true, queueIndex: 0 });
+
+    // Advance through the queue one sound at a time; each sound's `onEnded`
+    // schedules the next. Looping is forced off so the queue can progress.
+    const step = async (i: number) => {
+      const st = get();
+      if (!st.queuePlaying || i >= st.queue.length) {
+        set({ queuePlaying: false, queueIndex: 0 });
+        return;
+      }
+      set({ queueIndex: i });
+      const id = st.queue[i]!;
+      const sound = st.sounds.find((s) => s.id === id);
+      if (!sound) return void step(i + 1);
+      await get().ensureSoundLoaded(id);
+      if (!get().queuePlaying) return; // stopped while decoding
+      const next: Sound = {
+        ...sound,
+        playCount: sound.playCount + 1,
+        lastPlayed: Date.now(),
+      };
+      void storage.putSound(next);
+      set((s) => ({ sounds: s.sounds.map((x) => (x.id === id ? next : x)) }));
+      audioEngine.play(id, sound.playback, { title: sound.title }, {
+        forceNoLoop: true,
+        onEnded: () => void step(i + 1),
+      });
+    };
+    void step(0);
+  },
+
+  stopQueue: () => {
+    if (get().queuePlaying) {
+      set({ queuePlaying: false, queueIndex: 0 });
+      audioEngine.stopAll();
+    }
+  },
 
   playRandom: (scope) => {
     const { sounds, activeCategory } = get();
@@ -316,7 +386,10 @@ export const useStore = create<State>((set, get) => ({
     audioEngine.unload(id);
     await storage.deleteSound(id);
     await storage.deleteBlob(sound.blobKey);
-    set((st) => ({ sounds: st.sounds.filter((s) => s.id !== id) }));
+    set((st) => ({
+      sounds: st.sounds.filter((s) => s.id !== id),
+      queue: st.queue.filter((qid) => qid !== id),
+    }));
   },
 
   duplicateSound: async (id) => {
@@ -454,6 +527,16 @@ export const useStore = create<State>((set, get) => ({
     return list.sort((a, b) => Number(b.favorite) - Number(a.favorite));
   },
 }));
+
+/** Immutably move an array item from `from` to `to`, clamping out-of-range. */
+export function moveItem<T>(arr: T[], from: number, to: number): T[] {
+  if (from < 0 || from >= arr.length || to < 0 || to >= arr.length || from === to)
+    return arr;
+  const copy = [...arr];
+  const [item] = copy.splice(from, 1);
+  copy.splice(to, 0, item as T);
+  return copy;
+}
 
 const PALETTE = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',

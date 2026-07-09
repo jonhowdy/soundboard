@@ -14,10 +14,12 @@ export function TopBar({
   onOpenRecord,
   onOpenSettings,
   onOpenStats,
+  onOpenQueue,
 }: {
   onOpenRecord: () => void;
   onOpenSettings: () => void;
   onOpenStats: () => void;
+  onOpenQueue: () => void;
 }) {
   const search = useStore((s) => s.search);
   const setSearch = useStore((s) => s.setSearch);
@@ -29,6 +31,7 @@ export function TopBar({
   const updateSettings = useStore((s) => s.updateSettings);
   const playRandom = useStore((s) => s.playRandom);
   const stopAll = useStore((s) => s.stopAll);
+  const queueCount = useStore((s) => s.queue.length);
 
   return (
     <div className="flex flex-col gap-3">
@@ -70,6 +73,14 @@ export function TopBar({
         </button>
         <button onClick={stopAll} className="btn-ghost" title="Stop all (Esc)">
           ⏹ <span className="hidden md:inline">Stop</span>
+        </button>
+        <button onClick={onOpenQueue} className="btn-ghost relative" title="Queue">
+          📋
+          {queueCount > 0 && (
+            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-white">
+              {queueCount}
+            </span>
+          )}
         </button>
         <button onClick={onOpenRecord} className="btn-ghost" title="Record">
           🎙️

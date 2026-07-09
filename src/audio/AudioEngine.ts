@@ -186,6 +186,7 @@ export class AudioEngine {
     id: string,
     settings: PlaybackSettings,
     meta: { title: string },
+    opts: { onEnded?: () => void; forceNoLoop?: boolean } = {},
   ): string | null {
     const ctx = this.ensureCtx();
     let buffer = this.buffers.get(id);
@@ -195,9 +196,10 @@ export class AudioEngine {
       buffer = this.getReversed(id, buffer);
     }
 
+    const loop = settings.loop && !opts.forceNoLoop;
     const src = ctx.createBufferSource();
     src.buffer = buffer;
-    src.loop = settings.loop;
+    src.loop = loop;
     src.playbackRate.value = clamp(settings.rate, 0.25, 4);
     // Pitch shift in cents (100 cents per semitone). Independent of rate.
     if (settings.pitch !== 0 && 'detune' in src) {
@@ -224,7 +226,7 @@ export class AudioEngine {
     const voice: Voice = { id: voiceId, soundId: id, src, gain, title: meta.title, startedAt: Date.now() };
 
     // Schedule fade-out for non-looping sounds with a known duration.
-    if (!settings.loop && settings.fadeOut > 0) {
+    if (!loop && settings.fadeOut > 0) {
       const dur = buffer.duration / src.playbackRate.value;
       const fadeStart = now + Math.max(0, dur - settings.fadeOut);
       gain.gain.setValueAtTime(target, fadeStart);
@@ -240,6 +242,7 @@ export class AudioEngine {
         /* already disconnected */
       }
       this.emit();
+      opts.onEnded?.();
     };
 
     src.start(now);

@@ -14,6 +14,7 @@ import { SoundEditor } from './components/SoundEditor';
 import { RecordModal } from './components/RecordModal';
 import { SettingsModal } from './components/SettingsModal';
 import { StatsModal } from './components/StatsModal';
+import { QueueModal } from './components/QueueModal';
 
 export function App() {
   const init = useStore((s) => s.init);
@@ -24,6 +25,7 @@ export function App() {
   const [record, setRecord] = useState(false);
   const [settings, setSettings] = useState(false);
   const [stats, setStats] = useState(false);
+  const [queue, setQueue] = useState(false);
   const [dragging, setDragging] = useState(false);
 
   useHotkeys();
@@ -36,6 +38,7 @@ export function App() {
     if (record) return setRecord(false), true;
     if (settings) return setSettings(false), true;
     if (stats) return setStats(false), true;
+    if (queue) return setQueue(false), true;
     if (st.activeVoices.length) return st.stopAll(), true;
     return false;
   };
@@ -116,6 +119,7 @@ export function App() {
             onOpenRecord={() => setRecord(true)}
             onOpenSettings={() => setSettings(true)}
             onOpenStats={() => setStats(true)}
+            onOpenQueue={() => setQueue(true)}
           />
         </div>
       </header>
@@ -131,6 +135,7 @@ export function App() {
       <Mixer />
 
       {editingId && <SoundEditor />}
+      <QueueModal open={queue} onClose={() => setQueue(false)} />
       <RecordModal open={record} onClose={() => setRecord(false)} />
       <SettingsModal open={settings} onClose={() => setSettings(false)} />
       <StatsModal open={stats} onClose={() => setStats(false)} />

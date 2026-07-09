@@ -50,7 +50,8 @@ M7) persist a token set to the `meta` store.
 | Component | Purpose |
 |-----------|---------|
 | `SoundButton` | The core tile: icon/image, title, subtitle, waveform, star, hotkey, ripple/glow/confetti, right-click → edit |
-| `SoundGrid` | Responsive 2×2–6×6 grid + "add sound" drop target |
+| `SoundGrid` | Responsive 2×2–6×6 grid, paginated into pages with swipe + dots |
+| `QueueModal` | Ordered play queue: add-picker, reorder/remove, play-all with now-playing highlight |
 | `TopBar` | Search, favorites toggle, random, stop, record/stats/settings, sort tabs, grid-size selector |
 | `CategoryBar` | Color chips with counts + inline "new category" |
 | `Mixer` | Floating live mixer: per-voice volume/stop + master volume |

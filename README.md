@@ -24,7 +24,8 @@ design languages.
 |------|-----------|
 | **Instant playback** | Web Audio API engine; buffers are decoded & cached up front so a tap only wires `BufferSource → Gain → master` (sub-30 ms) |
 | **Sound buttons** | Emoji/image icon, title, subtitle, custom color gradient, live waveform, favorite star, hotkey badge, press/ripple/glow/confetti animations |
-| **Grid** | Responsive 2×2 → 6×6 layouts, auto-resizing tiles |
+| **Grid** | Responsive 2×2 → 6×6 layouts, auto-resizing tiles, multi-page with swipe + page dots |
+| **Queue mode** | Build an ordered queue, reorder/remove, and auto-play the whole queue in sequence with a live now-playing highlight |
 | **Playback FX** | Volume, speed, pitch (detune), fade in/out, reverse, loop, one-shot/hold modes |
 | **Audio editing** | Waveform trim/crop with draggable region + preview, normalize, baked fades, reverse — re-encoded to WAV on apply |
 | **AI auto-style** | One-click offline suggestion of emoji, color and tags from a sound's title |

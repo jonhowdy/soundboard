@@ -60,8 +60,17 @@ haptics/status-bar no-op safely). Compiling `.ipa`/`.aab` needs Xcode/Android
 Studio.*
 
 **Remaining:** native **SQLite** storage plugin for very large libraries,
-background audio, share-sheet / Files import, landscape polish, swipe-between-
-pages (ships with multi-page), TestFlight + Play internal testing.
+background audio, share-sheet / Files import, landscape polish, TestFlight +
+Play internal testing.
+
+## ✅ M5.5 — Queue mode & multi-page board *(done)*
+**Queue:** build an ordered queue (add from an in-modal picker, reorder, remove,
+clear) and **auto-play the whole queue in sequence** — each sound's `onEnded`
+advances to the next (looping forced off), with a live now-playing highlight and
+a count badge in the top bar. **Multi-page:** the board paginates into
+gridSize×gridSize screens with **swipe** (touch), on-screen arrows and page dots
+— this is the mobile shell's swipe-between-pages. *Verified in-browser: 2×2 grid
+→ 3 pages, queue of 3 plays with highlight, 0 console errors; 8 new tests.*
 
 ## 🔜 M6 — Backup & resilience
 Automatic daily local backups with version history + one-tap restore. ZIP and CSV
@@ -69,7 +78,7 @@ exports. Import from ZIP archives.
 
 ## 🔜 M7 — Personalization & packs
 User-created themes, favorite collections, installable **sound packs** (signed,
-versioned bundles) with an in-app catalog. Queue mode with reorder/auto-advance.
+versioned bundles) with an in-app catalog.
 
 ## 🔜 M8 — Cloud sync (opt-in)
 Supabase auth + Postgres schema (see DATABASE.md), content-addressed encrypted
