@@ -85,6 +85,31 @@ export interface Sound {
   createdAt: number;
   /** Key into the audio blob store (IndexedDB). */
   blobKey: string;
+  /** Id of the sound pack this sound came from, if installed from one. */
+  packId?: string;
+}
+
+/** A single sound within a downloadable pack. */
+export interface PackSoundDef {
+  /** Synth voice key used to render the audio offline. */
+  synth: string;
+  title: string;
+  emoji: string;
+  tags: string[];
+}
+
+/** An installable, versioned sound pack. */
+export interface SoundPack {
+  id: string;
+  name: string;
+  description: string;
+  emoji: string;
+  /** Accent color for the pack and its category. */
+  color: string;
+  /** Category name the pack's sounds are filed under. */
+  category: string;
+  version: number;
+  sounds: PackSoundDef[];
 }
 
 export type ThemeId =

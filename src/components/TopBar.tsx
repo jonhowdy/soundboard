@@ -15,11 +15,13 @@ export function TopBar({
   onOpenSettings,
   onOpenStats,
   onOpenQueue,
+  onOpenPacks,
 }: {
   onOpenRecord: () => void;
   onOpenSettings: () => void;
   onOpenStats: () => void;
   onOpenQueue: () => void;
+  onOpenPacks: () => void;
 }) {
   const search = useStore((s) => s.search);
   const setSearch = useStore((s) => s.setSearch);
@@ -81,6 +83,9 @@ export function TopBar({
               {queueCount}
             </span>
           )}
+        </button>
+        <button onClick={onOpenPacks} className="btn-ghost" title="Sound packs">
+          🎁
         </button>
         <button onClick={onOpenRecord} className="btn-ghost" title="Record">
           🎙️

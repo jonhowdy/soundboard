@@ -76,9 +76,17 @@ gridSize×gridSize screens with **swipe** (touch), on-screen arrows and page dot
 Automatic daily local backups with version history + one-tap restore. ZIP and CSV
 exports. Import from ZIP archives.
 
-## 🔜 M7 — Personalization & packs
-User-created themes, favorite collections, installable **sound packs** (signed,
-versioned bundles) with an in-app catalog.
+## 🟡 M7 — Personalization & packs *(packs done)*
+**Done:** installable, versioned **sound packs** with an in-app catalog — 5 built-in
+packs (Retro Arcade, Drum Kit, Notifications, Podcast FX, Meme Classics), each
+rendered **offline** from the synth palette and filed under its own category.
+One-tap install/remove, installed state persisted, per-sound preview.
+*Verified in-browser: install adds a pack's sounds (12 → 18) with a live count,
+remove reverts cleanly, 0 console errors; 6 new tests.*
+
+**Remaining:** user-created themes, favorite collections, and downloadable
+(network-fetched) third-party packs signed + cached on top of the same
+`SoundPack` shape.
 
 ## 🔜 M8 — Cloud sync (opt-in)
 Supabase auth + Postgres schema (see DATABASE.md), content-addressed encrypted

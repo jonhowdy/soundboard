@@ -17,6 +17,8 @@ import { hapticTap } from '../platform/haptics';
 import { syncStatusBar } from '../platform/native';
 import { applyTheme } from '../themes/themes';
 import { buildSeed } from '../data/seed';
+import { PACKS } from '../data/packs';
+import { SYNTH_SOUNDS } from '../utils/synth';
 import {
   arrayBufferToDataUrl,
   dataUrlToArrayBuffer,
@@ -73,6 +75,11 @@ interface State {
   addCategory: (name: string, color: string, emoji?: string) => void;
   deleteCategory: (id: string) => Promise<void>;
 
+  // sound packs
+  installedPacks: string[];
+  installPack: (packId: string) => Promise<void>;
+  uninstallPack: (packId: string) => Promise<void>;
+
   updateSettings: (patch: Partial<Settings>) => void;
   setVoiceVolume: (voiceId: string, v: number) => void;
 
@@ -117,6 +124,7 @@ export const useStore = create<State>((set, get) => ({
   favoritesOnly: false,
   sort: 'recent',
   editingSoundId: null,
+  installedPacks: [],
 
   init: async () => {
     // Wire the engine → store bridge for the live mixer.
@@ -139,12 +147,13 @@ export const useStore = create<State>((set, get) => ({
       await storage.setFlag('seeded', true);
     }
 
-    const [sounds, categories] = await Promise.all([
+    const [sounds, categories, installedPacks] = await Promise.all([
       storage.getSounds(),
       storage.getCategories(),
+      storage.getMeta<string[]>('installedPacks'),
     ]);
 
-    set({ sounds, categories, settings, ready: true });
+    set({ sounds, categories, settings, installedPacks: installedPacks ?? [], ready: true });
 
     // Decode buffers in the background so first taps are instant.
     void (async () => {
@@ -434,6 +443,83 @@ export const useStore = create<State>((set, get) => ({
     set((st) => ({
       categories: st.categories.filter((c) => c.id !== id),
       activeCategory: st.activeCategory === id ? null : st.activeCategory,
+    }));
+  },
+
+  installPack: async (packId) => {
+    const pack = PACKS.find((p) => p.id === packId);
+    if (!pack || get().installedPacks.includes(packId)) return;
+
+    // Reuse an existing category with the pack's name, or create one.
+    let category = get().categories.find((c) => c.name === pack.category);
+    if (!category) {
+      category = { id: nanoid(), name: pack.category, color: pack.color, emoji: pack.emoji, createdAt: Date.now() };
+      await storage.putCategory(category);
+      set((st) => ({ categories: [...st.categories, category!] }));
+    }
+
+    const added: Sound[] = [];
+    for (const def of pack.sounds) {
+      const render = SYNTH_SOUNDS[def.synth];
+      if (!render) continue;
+      const audio = render();
+      const blobKey = nanoid();
+      await storage.putBlob(blobKey, audio);
+      const sound: Sound = {
+        id: nanoid(),
+        title: def.title,
+        subtitle: pack.name,
+        emoji: def.emoji,
+        color: pack.color,
+        categoryId: category.id,
+        tags: def.tags,
+        favorite: false,
+        format: 'wav',
+        duration: 0,
+        waveform: [],
+        playback: { ...DEFAULT_PLAYBACK },
+        playMode: 'oneshot',
+        playCount: 0,
+        lastPlayed: null,
+        createdAt: Date.now() + added.length,
+        blobKey,
+        packId,
+      };
+      await storage.putSound(sound);
+      added.push(sound);
+    }
+
+    const installedPacks = [...get().installedPacks, packId];
+    await storage.setMeta('installedPacks', installedPacks);
+    set((st) => ({ sounds: [...st.sounds, ...added], installedPacks }));
+
+    // Decode the new sounds in the background for instant first play.
+    void (async () => {
+      for (const s of added) {
+        const patch = await ensureLoaded(s);
+        if (patch) {
+          const next = { ...s, ...patch };
+          await storage.putSound(next);
+          set((st) => ({ sounds: st.sounds.map((x) => (x.id === s.id ? next : x)) }));
+        }
+      }
+    })();
+  },
+
+  uninstallPack: async (packId) => {
+    const doomed = get().sounds.filter((s) => s.packId === packId);
+    for (const s of doomed) {
+      audioEngine.stopSound(s.id);
+      audioEngine.unload(s.id);
+      await storage.deleteSound(s.id);
+      await storage.deleteBlob(s.blobKey);
+    }
+    const installedPacks = get().installedPacks.filter((p) => p !== packId);
+    await storage.setMeta('installedPacks', installedPacks);
+    set((st) => ({
+      sounds: st.sounds.filter((s) => s.packId !== packId),
+      queue: st.queue.filter((qid) => !doomed.some((d) => d.id === qid)),
+      installedPacks,
     }));
   },
 

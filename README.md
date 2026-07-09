@@ -37,6 +37,7 @@ design languages.
 | **Recording** | Capture from mic/USB/Bluetooth (MediaRecorder), preview, name, save |
 | **Import/Export** | Drag-and-drop, file picker, MP3/WAV/AAC/M4A/OGG/FLAC/AIFF; full JSON backup with embedded audio |
 | **Random & queue** | Random from library/category/favorites |
+| **Sound packs** | Installable, versioned pack catalog (Retro Arcade, Drum Kit, Notifications, Podcast FX, Meme Classics); one-tap install/remove, all offline |
 | **Themes** | Dark, Light, Neon, Retro, Cyberpunk, Minimal (CSS-variable driven) |
 | **Statistics** | Play counts, most/recently played, totals |
 | **Accessibility** | Keyboard nav, ARIA, large-text, high-contrast, color-blind mode, reduced-motion |

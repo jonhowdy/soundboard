@@ -83,6 +83,13 @@ export const storage = {
     await (await db()).put('meta', value, key);
   },
 
+  async getMeta<T>(key: string): Promise<T | undefined> {
+    return (await db()).get('meta', key) as Promise<T | undefined>;
+  },
+  async setMeta<T>(key: string, value: T): Promise<void> {
+    await (await db()).put('meta', value, key);
+  },
+
   async clearAll(): Promise<void> {
     const database = await db();
     await Promise.all([
