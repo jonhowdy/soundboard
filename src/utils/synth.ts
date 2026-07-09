@@ -4,37 +4,11 @@
  * WAV ArrayBuffers.
  */
 
+import { encodeWav } from './wav';
+
 const SR = 44100;
 
 type Voice = (t: number, dur: number) => number;
-
-function encodeWav(samples: Float32Array, sampleRate = SR): ArrayBuffer {
-  const buffer = new ArrayBuffer(44 + samples.length * 2);
-  const view = new DataView(buffer);
-  const writeStr = (off: number, s: string) => {
-    for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
-  };
-  writeStr(0, 'RIFF');
-  view.setUint32(4, 36 + samples.length * 2, true);
-  writeStr(8, 'WAVE');
-  writeStr(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM
-  view.setUint16(22, 1, true); // mono
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeStr(36, 'data');
-  view.setUint32(40, samples.length * 2, true);
-  let off = 44;
-  for (let i = 0; i < samples.length; i++) {
-    const s = Math.max(-1, Math.min(1, samples[i]!));
-    view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-    off += 2;
-  }
-  return buffer;
-}
 
 function render(dur: number, voice: Voice): ArrayBuffer {
   const n = Math.floor(dur * SR);
@@ -45,7 +19,7 @@ function render(dur: number, voice: Voice): ArrayBuffer {
     const env = Math.min(1, t / 0.01) * Math.min(1, (dur - t) / 0.03);
     out[i] = voice(t, dur) * env * 0.6;
   }
-  return encodeWav(out);
+  return encodeWav([out], SR);
 }
 
 const TAU = Math.PI * 2;

@@ -21,11 +21,18 @@ volume/speed/pitch/fade/reverse/loop), duplicate/delete, import (drag-drop +
 picker, 7 formats), recording, JSON backup import/export, statistics, six themes,
 accessibility modes.
 
-## 🔜 M3 — Audio editing & AI assist
-Waveform-based **trim/crop** UI, silence auto-trim, normalize, noise reduction
-(RNNoise WASM), format conversion (ffmpeg.wasm), merge sounds. AI helpers
-(on-device where possible): suggest emoji/color from title, auto-tag, auto-
-categorize, duplicate detection via content hash.
+## 🟡 M3 — Audio editing & AI assist *(core done)*
+**Done:** waveform-based **trim/crop** editor with draggable region handles and
+region preview, **normalize** (peak → −0.1 dBFS), baked **fade in/out**, and
+**reverse** — all pure, unit-tested transforms (`src/audio/edit.ts`) re-encoded to
+WAV on apply. Offline **AI auto-style**: infers emoji/color/tags from a title
+(`src/utils/suggest.ts`), one click in the editor.
+*Verified in-browser: right-click → Trim & edit → select region → normalize →
+preview → apply, 0 console errors; 12 new tests.*
+
+**Remaining:** silence auto-trim, noise reduction (RNNoise WASM), format
+conversion (ffmpeg.wasm), merge sounds, duplicate detection via content hash,
+ML-based category suggestions.
 
 ## 🔜 M4 — Desktop (Tauri)
 Wrap `dist/` in Tauri. Native **global hotkeys** (fire while unfocused), output-

@@ -8,13 +8,15 @@ store, and a thin end-to-end layer that drives the real browser.
 - **@testing-library/react** — component tests (render, query by role/label).
 - **Playwright** — e2e against the production preview, `npm run e2e`.
 
-## What's covered today (`src/test`, 18 tests, all green)
+## What's covered today (`src/test`, 30 tests, all green)
 
 | Suite | Layer | Verifies |
 |-------|-------|----------|
 | `audioFiles.test.ts` | unit | Format mapping, extension detection, title prettifier, data-URL round-trip |
 | `synth.test.ts` | unit | Every seed effect emits a valid mono 16-bit PCM WAV (RIFF/WAVE header, size math) |
 | `audioEngine.test.ts` | unit | `computeWaveform` bucket count, normalization, silence (no divide-by-zero) |
+| `edit.test.ts` | unit | trim (clamp/order/non-empty), normalize (peak + silence), fades, reverse, duration/peak |
+| `suggest.test.ts` | unit | Keyword→emoji/color/tags, fallback, stop-word filtering; multi-channel WAV encoder header/size |
 | `hotkeys.test.ts` | unit | Combo serialization (single keys, Space, modifier order, bare modifiers) |
 | `store.filter.test.ts` | integration | `visibleSounds` search across title/tag/category, category & favorites filters, sort, favorite pinning |
 

@@ -1,4 +1,5 @@
 import type { PlaybackSettings, ActiveVoice } from '../types';
+import type { Pcm } from './edit';
 import { nanoid } from 'nanoid';
 
 /**
@@ -71,6 +72,56 @@ export class AudioEngine {
   unload(id: string): void {
     this.buffers.delete(id);
     this.reversed.delete(id);
+  }
+
+  /** Snapshot a decoded buffer as editable PCM (copies channel data). */
+  getPcm(id: string): Pcm | null {
+    const buffer = this.buffers.get(id);
+    if (!buffer) return null;
+    const channels: Float32Array[] = [];
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      channels.push(new Float32Array(buffer.getChannelData(ch)));
+    }
+    return { channels, sampleRate: buffer.sampleRate };
+  }
+
+  /** Replace the cached buffer for a sound from edited PCM. Returns the buffer. */
+  setPcm(id: string, pcm: Pcm): AudioBuffer {
+    const ctx = this.ensureCtx();
+    const frames = pcm.channels[0]?.length ?? 0;
+    const buffer = ctx.createBuffer(
+      Math.max(1, pcm.channels.length),
+      Math.max(1, frames),
+      pcm.sampleRate,
+    );
+    pcm.channels.forEach((data, ch) => buffer.getChannelData(ch).set(data));
+    this.buffers.set(id, buffer);
+    this.reversed.delete(id); // invalidate reversed cache after an edit
+    return buffer;
+  }
+
+  /** Preview just the region [startSec, endSec) of a loaded sound. */
+  previewRegion(id: string, startSec: number, endSec: number): string | null {
+    const ctx = this.ensureCtx();
+    const buffer = this.buffers.get(id);
+    if (!buffer) return null;
+    const from = Math.max(0, Math.min(buffer.duration, startSec));
+    const to = Math.max(from, Math.min(buffer.duration, endSec));
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = ctx.createGain();
+    src.connect(gain).connect(this.master!);
+    const voiceId = nanoid(8);
+    const voice: Voice = { id: voiceId, soundId: id, src, gain, title: 'preview', startedAt: Date.now() };
+    src.onended = () => {
+      this.voices.delete(voiceId);
+      try { src.disconnect(); gain.disconnect(); } catch { /* noop */ }
+      this.emit();
+    };
+    src.start(ctx.currentTime, from, Math.max(0.01, to - from));
+    this.voices.set(voiceId, voice);
+    this.emit();
+    return voiceId;
   }
 
   /** Compute normalized waveform peaks (0..1) for a preview strip. */

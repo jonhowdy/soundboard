@@ -23,6 +23,8 @@ design languages.
 | **Sound buttons** | Emoji/image icon, title, subtitle, custom color gradient, live waveform, favorite star, hotkey badge, press/ripple/glow/confetti animations |
 | **Grid** | Responsive 2×2 → 6×6 layouts, auto-resizing tiles |
 | **Playback FX** | Volume, speed, pitch (detune), fade in/out, reverse, loop, one-shot/hold modes |
+| **Audio editing** | Waveform trim/crop with draggable region + preview, normalize, baked fades, reverse — re-encoded to WAV on apply |
+| **AI auto-style** | One-click offline suggestion of emoji, color and tags from a sound's title |
 | **Multi-playback + mixer** | Play many sounds at once; live mixer with per-voice volume, mute/stop, master volume |
 | **Categories** | Color-coded, emoji, unlimited, live counts |
 | **Search & sort** | By name, tag, category; sort by recent/A–Z/most-played/newest |

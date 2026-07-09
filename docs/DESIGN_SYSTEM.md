@@ -54,7 +54,8 @@ M7) persist a token set to the `meta` store.
 | `TopBar` | Search, favorites toggle, random, stop, record/stats/settings, sort tabs, grid-size selector |
 | `CategoryBar` | Color chips with counts + inline "new category" |
 | `Mixer` | Floating live mixer: per-voice volume/stop + master volume |
-| `SoundEditor` | Full editor: identity, color, tags, category, hotkey capture, all FX |
+| `SoundEditor` | Full editor: identity, color, tags, category, hotkey capture, all FX, auto-style |
+| `WaveformEditor` | Trim/crop with draggable region handles, normalize, fades, region preview |
 | `RecordModal` | Mic capture → preview → name → save |
 | `SettingsModal` | Theme picker, accessibility, feel, backup import/export |
 | `StatsModal` | Totals + most/recently played leaderboards |

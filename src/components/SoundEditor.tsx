@@ -3,7 +3,9 @@ import { useStore, PALETTE } from '../store/useStore';
 import type { PlayMode, Sound } from '../types';
 import { Modal, Slider, Toggle } from './ui';
 import { Waveform } from './Waveform';
+import { WaveformEditor } from './WaveformEditor';
 import { comboFromEvent } from '../hooks/useHotkeys';
+import { suggestMeta } from '../utils/suggest';
 
 const PLAY_MODES: { key: PlayMode; label: string }[] = [
   { key: 'oneshot', label: 'One shot' },
@@ -23,8 +25,12 @@ export function SoundEditor() {
 
   const [capturing, setCapturing] = useState(false);
   const [tagInput, setTagInput] = useState('');
+  const [trimOpen, setTrimOpen] = useState(false);
 
-  useEffect(() => setCapturing(false), [editingId]);
+  useEffect(() => {
+    setCapturing(false);
+    setTrimOpen(false);
+  }, [editingId]);
 
   if (!sound) return null;
 
@@ -50,8 +56,32 @@ export function SoundEditor() {
                 <Waveform peaks={sound.waveform} className="h-full w-full" />
               </div>
             </div>
-            <button onClick={() => play(sound.id)} className="btn bg-black/30 text-white">
+            <button
+              onClick={() => play(sound.id)}
+              className="btn bg-black/30 text-white"
+              aria-label="Preview"
+            >
               ▶
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => {
+                const s = suggestMeta(sound.title, sound.tags);
+                patch({ emoji: s.emoji, color: s.color, tags: s.tags });
+              }}
+              className="btn-ghost border border-line"
+              title="Auto-suggest emoji, color and tags from the title"
+            >
+              ✨ Auto-style
+            </button>
+            <button
+              onClick={() => setTrimOpen(true)}
+              className="btn-ghost border border-line"
+              title="Trim, normalize and fade the audio"
+            >
+              ✂️ Trim &amp; edit
             </button>
           </div>
 
@@ -296,6 +326,10 @@ export function SoundEditor() {
           </div>
         </div>
       </div>
+
+      {trimOpen && (
+        <WaveformEditor soundId={sound.id} onClose={() => setTrimOpen(false)} />
+      )}
     </Modal>
   );
 }

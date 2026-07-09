@@ -11,6 +11,8 @@ import type {
 import { DEFAULT_PLAYBACK, DEFAULT_SETTINGS } from '../types';
 import { storage } from '../db/database';
 import { audioEngine, AudioEngine } from '../audio/AudioEngine';
+import type { Pcm } from '../audio/edit';
+import { encodeWav } from '../utils/wav';
 import { applyTheme } from '../themes/themes';
 import { buildSeed } from '../data/seed';
 import {
@@ -49,6 +51,8 @@ interface State {
   importFiles: (files: FileList | File[]) => Promise<void>;
   addRecording: (blob: Blob, title: string) => Promise<void>;
   updateSound: (id: string, patch: Partial<Sound>) => void;
+  ensureSoundLoaded: (id: string) => Promise<boolean>;
+  applyAudioEdit: (id: string, pcm: Pcm) => Promise<void>;
   deleteSound: (id: string) => Promise<void>;
   duplicateSound: (id: string) => Promise<void>;
   toggleFavorite: (id: string) => void;
@@ -267,6 +271,38 @@ export const useStore = create<State>((set, get) => ({
     if (!sound) return;
     const next = { ...sound, ...patch };
     void storage.putSound(next);
+    set((st) => ({ sounds: st.sounds.map((s) => (s.id === id ? next : s)) }));
+  },
+
+  ensureSoundLoaded: async (id) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (!sound) return false;
+    if (audioEngine.isLoaded(id)) return true;
+    const patch = await ensureLoaded(sound);
+    if (patch) {
+      const next = { ...sound, ...patch };
+      await storage.putSound(next);
+      set((st) => ({ sounds: st.sounds.map((s) => (s.id === id ? next : s)) }));
+    }
+    return audioEngine.isLoaded(id);
+  },
+
+  applyAudioEdit: async (id, pcm) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (!sound) return;
+    audioEngine.stopSound(id);
+    // Re-encode the edited audio to WAV, replace the blob under the same key,
+    // swap the cached buffer, and refresh derived duration + waveform.
+    const wav = encodeWav(pcm.channels, pcm.sampleRate);
+    await storage.putBlob(sound.blobKey, wav);
+    const buffer = audioEngine.setPcm(id, pcm);
+    const next: Sound = {
+      ...sound,
+      format: 'wav',
+      duration: buffer.duration,
+      waveform: AudioEngine.computeWaveform(buffer),
+    };
+    await storage.putSound(next);
     set((st) => ({ sounds: st.sounds.map((s) => (s.id === id ? next : s)) }));
   },
 
