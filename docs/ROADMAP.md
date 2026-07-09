@@ -34,11 +34,19 @@ preview → apply, 0 console errors; 12 new tests.*
 conversion (ffmpeg.wasm), merge sounds, duplicate detection via content hash,
 ML-based category suggestions.
 
-## 🔜 M4 — Desktop (Tauri)
-Wrap `dist/` in Tauri. Native **global hotkeys** (fire while unfocused), output-
-device selection, and a **virtual audio device** bridge (VB-Cable/BlackHole
-guidance) so sounds route into OBS/Discord/Zoom/Teams. Signed installers for
-Win/macOS/Linux via CI.
+## 🟡 M4 — Desktop (Tauri) *(core done)*
+**Done:** Tauri v2 shell in `src-tauri/` wrapping `dist/` — **compiles to a
+native binary** (verified via `cargo build`, links `global-hotkey`). OS-level
+**global hotkeys** that fire while unfocused (`src/platform/globalHotkeys.ts`,
+accelerator conversion unit-tested), **output-device routing** via
+`setSinkId` (Settings → Audio output) with VB-Cable/BlackHole guidance for
+OBS/Discord/Zoom/Teams. CI job compiles the desktop app on Linux.
+*The web bundle is unchanged; the Tauri plugin is lazy-loaded so browsers never
+download it.*
+
+**Remaining:** produce signed installers (Win/macOS/Linux) via
+`tauri-action` on release tags, add `.ico`/`.icns`, system-tray + auto-launch,
+and a native low-latency output path if WebView `setSinkId` proves insufficient.
 
 ## 🔜 M5 — Mobile (Capacitor)
 iOS + Android shells over the same bundle. Native haptics, background audio,

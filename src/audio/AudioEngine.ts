@@ -54,6 +54,41 @@ export class AudioEngine {
     }
   }
 
+  /** Whether this browser/WebView can route audio to a chosen output device. */
+  supportsOutputRouting(): boolean {
+    return (
+      typeof AudioContext !== 'undefined' &&
+      'setSinkId' in AudioContext.prototype
+    );
+  }
+
+  /**
+   * Route all output to a specific device (headphones, USB, Bluetooth, HDMI or a
+   * virtual cable feeding OBS/Discord). Pass '' for the system default.
+   * Uses `AudioContext.setSinkId`, available in Chromium-based browsers and
+   * WebView2; a no-op where unsupported.
+   */
+  async setOutputDevice(deviceId: string): Promise<boolean> {
+    const ctx = this.ensureCtx() as AudioContext & {
+      setSinkId?: (id: string) => Promise<void>;
+    };
+    if (typeof ctx.setSinkId !== 'function') return false;
+    try {
+      await ctx.setSinkId(deviceId);
+      return true;
+    } catch (err) {
+      console.warn('[soundboard] setOutputDevice failed', err);
+      return false;
+    }
+  }
+
+  /** List available audio output devices (requires prior mic permission for labels). */
+  async listOutputDevices(): Promise<MediaDeviceInfo[]> {
+    if (!navigator.mediaDevices?.enumerateDevices) return [];
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter((d) => d.kind === 'audiooutput');
+  }
+
   /** Decode raw bytes into a cached AudioBuffer. Idempotent per id. */
   async load(id: string, data: ArrayBuffer): Promise<AudioBuffer> {
     const existing = this.buffers.get(id);

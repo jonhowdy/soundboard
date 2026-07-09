@@ -6,10 +6,12 @@ near-zero latency. Inspired by Stream Deck, Voicemod, Spotify and the Apple/Mate
 design languages.
 
 > **Status:** the **web app** (this repository's core) is fully implemented,
-> tested and production-buildable. It is a PWA that already runs offline on
-> Windows, macOS, Linux, iOS, Android and any modern browser. The desktop
-> (Tauri) and native-mobile (Capacitor) shells wrap this exact codebase — see
-> the [roadmap](docs/ROADMAP.md) and [deployment guide](docs/DEPLOYMENT.md).
+> tested and production-buildable — a PWA that runs offline on Windows, macOS,
+> Linux, iOS, Android and any modern browser. The **Tauri desktop shell** is
+> scaffolded and **compiles to a native binary** (`src-tauri/`), adding OS-level
+> global hotkeys and audio-output routing. The native-mobile (Capacitor) shell
+> wraps the same codebase next — see the [roadmap](docs/ROADMAP.md),
+> [desktop guide](docs/DESKTOP.md) and [deployment guide](docs/DEPLOYMENT.md).
 
 <p align="center"><em>Right-click (or long-press) any button to edit it · Esc stops everything · number keys 1–9 trigger the seeded sounds.</em></p>
 
@@ -36,6 +38,7 @@ design languages.
 | **Themes** | Dark, Light, Neon, Retro, Cyberpunk, Minimal (CSS-variable driven) |
 | **Statistics** | Play counts, most/recently played, totals |
 | **Accessibility** | Keyboard nav, ARIA, large-text, high-contrast, color-blind mode, reduced-motion |
+| **Desktop (Tauri)** | Native shell wrapping the web build; OS-level global hotkeys (fire while unfocused) + output-device routing to OBS/Discord via virtual cable |
 | **Offline-first** | IndexedDB storage + service-worker precache; no account required |
 | **Security** | No ads, no tracking, no backend needed, local-only data |
 
@@ -123,11 +126,13 @@ soundboard/
 │  ├─ types/          # Shared domain model
 │  ├─ utils/          # Audio-file helpers, offline synth
 │  ├─ test/           # Vitest unit + integration tests
+│  ├─ platform/       # Tauri detection + global-hotkey bridge (no-op on web)
 │  ├─ App.tsx         # Composition root
 │  └─ main.tsx        # Entry point
+├─ src-tauri/         # Tauri v2 desktop shell (Rust): global hotkeys, config, icons
 ├─ public/            # Icons, favicon, PWA assets
-├─ docs/              # Architecture, DB, design system, roadmap, testing, deployment
-├─ .github/workflows/ # CI (typecheck → test → build)
+├─ docs/              # Architecture, DB, design system, roadmap, desktop, deployment
+├─ .github/workflows/ # CI (web: typecheck → test → build; desktop: cargo build)
 └─ vite.config.ts     # Vite + PWA config
 ```
 
@@ -143,8 +148,9 @@ Full breakdown and data flow in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 4. [Wireframes](docs/WIREFRAMES.md) — screen-by-screen layouts
 5. [Roadmap](docs/ROADMAP.md) — milestones M0–M9, future features
 6. [Testing strategy](docs/TESTING.md) — unit/integration/e2e pyramid
-7. [Deployment & publishing](docs/DEPLOYMENT.md) — web, Tauri desktop, App Store, Google Play
-8. [Maintenance](docs/MAINTENANCE.md) — dependency, release and support practices
+7. [Desktop app](docs/DESKTOP.md) — Tauri build, global hotkeys, OBS/Discord routing
+8. [Deployment & publishing](docs/DEPLOYMENT.md) — web, Tauri desktop, App Store, Google Play
+9. [Maintenance](docs/MAINTENANCE.md) — dependency, release and support practices
 
 ---
 

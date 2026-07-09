@@ -8,7 +8,7 @@ store, and a thin end-to-end layer that drives the real browser.
 - **@testing-library/react** — component tests (render, query by role/label).
 - **Playwright** — e2e against the production preview, `npm run e2e`.
 
-## What's covered today (`src/test`, 30 tests, all green)
+## What's covered today (`src/test`, 34 tests, all green)
 
 | Suite | Layer | Verifies |
 |-------|-------|----------|
@@ -18,6 +18,7 @@ store, and a thin end-to-end layer that drives the real browser.
 | `edit.test.ts` | unit | trim (clamp/order/non-empty), normalize (peak + silence), fades, reverse, duration/peak |
 | `suggest.test.ts` | unit | Keyword→emoji/color/tags, fallback, stop-word filtering; multi-channel WAV encoder header/size |
 | `hotkeys.test.ts` | unit | Combo serialization (single keys, Space, modifier order, bare modifiers) |
+| `globalHotkeys.test.ts` | unit | Desktop accelerator conversion (modifier mapping, F-keys, Space, null when no key) |
 | `store.filter.test.ts` | integration | `visibleSounds` search across title/tag/category, category & favorites filters, sort, favorite pinning |
 
 Run: `npm test` · watch: `npm run test:watch` · UI: `npm run test:ui`.

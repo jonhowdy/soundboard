@@ -1,9 +1,11 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { THEMES } from '../themes/themes';
 import type { ThemeId } from '../types';
 import { Modal, Toggle } from './ui';
 import type { BackupFile } from '../types';
+import { audioEngine } from '../audio/AudioEngine';
+import { isDesktop } from '../platform';
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const settings = useStore((s) => s.settings);
@@ -11,6 +13,25 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const exportBackup = useStore((s) => s.exportBackup);
   const importBackup = useStore((s) => s.importBackup);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const routingSupported = audioEngine.supportsOutputRouting();
+
+  const refreshDevices = async () => {
+    // Labels only populate after the user has granted mic/audio permission.
+    try {
+      await navigator.mediaDevices?.getUserMedia({ audio: true }).then((s) =>
+        s.getTracks().forEach((t) => t.stop()),
+      );
+    } catch {
+      /* permission optional; unlabeled devices still list */
+    }
+    setDevices(await audioEngine.listOutputDevices());
+  };
+
+  useEffect(() => {
+    if (open && routingSupported) void audioEngine.listOutputDevices().then(setDevices);
+  }, [open, routingSupported]);
 
   const doExport = async () => {
     const backup = await exportBackup();
@@ -113,6 +134,42 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             checked={settings.confetti}
             onChange={(v) => update({ confetti: v })}
           />
+        </section>
+
+        <section>
+          <h3 className="mb-2 text-sm font-bold text-muted">Audio output</h3>
+          {routingSupported ? (
+            <div className="space-y-2">
+              <select
+                className="field"
+                value={settings.outputDeviceId}
+                onChange={(e) => update({ outputDeviceId: e.target.value })}
+                aria-label="Output device"
+              >
+                <option value="">System default</option>
+                {devices.map((d, i) => (
+                  <option key={d.deviceId || i} value={d.deviceId}>
+                    {d.label || `Output ${i + 1}`}
+                  </option>
+                ))}
+              </select>
+              <button onClick={() => void refreshDevices()} className="btn-ghost w-full border border-line">
+                🔄 Refresh devices
+              </button>
+              <p className="text-xs text-muted">
+                Route playback to headphones, USB/Bluetooth speakers, or a{' '}
+                <strong>virtual audio device</strong> (VB-Cable / BlackHole) to
+                pipe sounds into OBS, Discord, Zoom or Teams. See the desktop
+                guide for setup.
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted">
+              {isDesktop()
+                ? 'This desktop WebView does not expose per-device routing; route audio at the OS level (see the desktop guide).'
+                : 'Per-device output routing needs a Chromium-based browser (Chrome/Edge) or the desktop app.'}
+            </p>
+          )}
         </section>
 
         <section>

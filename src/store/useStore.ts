@@ -113,6 +113,7 @@ export const useStore = create<State>((set, get) => ({
     settings = { ...DEFAULT_SETTINGS, ...settings };
     applyTheme(settings.theme);
     audioEngine.setMasterVolume(settings.masterVolume);
+    if (settings.outputDeviceId) void audioEngine.setOutputDevice(settings.outputDeviceId);
 
     const seeded = await storage.getFlag('seeded');
     if (!seeded) {
@@ -367,6 +368,8 @@ export const useStore = create<State>((set, get) => ({
     if (patch.theme) applyTheme(patch.theme);
     if (patch.masterVolume !== undefined)
       audioEngine.setMasterVolume(patch.masterVolume);
+    if (patch.outputDeviceId !== undefined)
+      void audioEngine.setOutputDevice(patch.outputDeviceId);
     set({ settings });
   },
 

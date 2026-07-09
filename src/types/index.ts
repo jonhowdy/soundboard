@@ -110,6 +110,8 @@ export interface Settings {
   largeText: boolean;
   showWaveforms: boolean;
   confetti: boolean;
+  /** Chosen audio output device id ('' = system default). */
+  outputDeviceId: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -122,6 +124,7 @@ export const DEFAULT_SETTINGS: Settings = {
   largeText: false,
   showWaveforms: true,
   confetti: false,
+  outputDeviceId: '',
 };
 
 /** Shape of a full library export / backup file. */

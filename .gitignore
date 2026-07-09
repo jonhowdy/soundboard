@@ -8,3 +8,8 @@ playwright-report
 test-results
 .vite
 *.log
+
+# Tauri / Rust
+src-tauri/target
+src-tauri/gen
+

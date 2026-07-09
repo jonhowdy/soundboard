@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useStore } from './store/useStore';
 import { audioEngine } from './audio/AudioEngine';
 import { useHotkeys } from './hooks/useHotkeys';
+import { isTauri } from './platform';
+import { syncGlobalHotkeys, clearGlobalHotkeys } from './platform/globalHotkeys';
 import { isSupportedAudioFile } from './utils/audioFiles';
 import { TopBar } from './components/TopBar';
 import { CategoryBar } from './components/CategoryBar';
@@ -28,6 +30,25 @@ export function App() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Desktop: mirror sound hotkeys into OS-level global shortcuts and keep them
+  // in sync as sounds are added/edited/removed.
+  useEffect(() => {
+    if (!isTauri()) return;
+    const trigger = (id: string) => useStore.getState().playSound(id);
+    let prev = useStore.getState().sounds;
+    void syncGlobalHotkeys(prev, trigger);
+    const unsub = useStore.subscribe((st) => {
+      if (st.sounds !== prev) {
+        prev = st.sounds;
+        void syncGlobalHotkeys(prev, trigger);
+      }
+    });
+    return () => {
+      unsub();
+      void clearGlobalHotkeys();
+    };
+  }, []);
 
   // Global drag-and-drop import.
   useEffect(() => {

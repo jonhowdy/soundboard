@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import { isTauri } from '../platform';
 
 /** Serialize a KeyboardEvent into the canonical combo string used for hotkeys. */
 export function comboFromEvent(e: KeyboardEvent | React.KeyboardEvent): string {
@@ -39,6 +40,10 @@ export function useHotkeys(): void {
         stopAll();
         return;
       }
+
+      // On desktop the OS-level global-shortcut plugin triggers sounds (even
+      // when unfocused); handling them here too would double-fire.
+      if (isTauri()) return;
 
       const combo = comboFromEvent(e);
       const match = useStore
