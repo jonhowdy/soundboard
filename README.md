@@ -7,12 +7,15 @@ design languages.
 
 > **Status:** the **web app** (this repository's core) is fully implemented,
 > tested and production-buildable — a PWA that runs offline on Windows, macOS,
-> Linux, iOS, Android and any modern browser. The **Tauri desktop shell**
-> (`src-tauri/`) **compiles to a native binary**, adding OS-level global hotkeys
-> and audio-output routing. The **Capacitor mobile shell** wraps the same
-> codebase with native haptics, status-bar theming and safe-area handling. See
-> the [roadmap](docs/ROADMAP.md), [desktop](docs/DESKTOP.md), [mobile](docs/MOBILE.md)
-> and [deployment](docs/DEPLOYMENT.md) guides.
+> Linux, iOS, Android and any modern browser. It includes waveform audio editing,
+> offline AI auto-style, a play queue, multi-page boards, installable sound packs,
+> daily backups with version history, and a custom theme editor. The **Tauri
+> desktop shell** (`src-tauri/`) **compiles to a native binary**, adding OS-level
+> global hotkeys and audio-output routing; the **Capacitor mobile shell** wraps
+> the same codebase with native haptics, status-bar theming and safe-area
+> handling. Locked down by **59 unit + 13 end-to-end tests, all green in CI**. See
+> the [roadmap](docs/ROADMAP.md), [desktop](docs/DESKTOP.md), [mobile](docs/MOBILE.md),
+> [testing](docs/TESTING.md) and [deployment](docs/DEPLOYMENT.md) guides.
 
 <p align="center"><em>Right-click (or long-press) any button to edit it · Esc stops everything · number keys 1–9 trigger the seeded sounds.</em></p>
 
