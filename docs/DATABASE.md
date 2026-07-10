@@ -3,7 +3,7 @@
 Two tiers: a **local** offline store (always on) and an **optional cloud**
 Postgres schema (only when the user enables encrypted sync).
 
-## Local — IndexedDB (`soundboard`, v1)
+## Local — IndexedDB (`soundboard`, v2)
 
 Implemented in `src/db/database.ts`.
 
@@ -12,7 +12,8 @@ Implemented in `src/db/database.ts`.
 | `sounds` | `id` | `Sound` | Metadata only — never the audio bytes |
 | `categories` | `id` | `Category` | |
 | `blobs` | `blobKey` | `ArrayBuffer` | Raw encoded audio, separated from metadata |
-| `meta` | string key | `unknown` | `settings`, feature flags (e.g. `seeded`) |
+| `backups` | `id` | `BackupFile` | v2: version-history snapshots for restore |
+| `meta` | string key | `unknown` | `settings`, `installedPacks`, `backupIndex`, `lastAutoBackup`, flags (e.g. `seeded`) |
 
 **Why separate `blobs`?** The grid reads `sounds`/`categories` constantly; those
 records are a few hundred bytes each. Audio can be megabytes. Keeping binaries in

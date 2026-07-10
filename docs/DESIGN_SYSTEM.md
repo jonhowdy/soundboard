@@ -53,6 +53,7 @@ M7) persist a token set to the `meta` store.
 | `SoundGrid` | Responsive 2×2–6×6 grid, paginated into pages with swipe + dots |
 | `QueueModal` | Ordered play queue: add-picker, reorder/remove, play-all with now-playing highlight |
 | `PackModal` | Sound-pack catalog: install/remove versioned bundles with per-sound chips and preview |
+| `BackupModal` | Version history (restore/delete), backup-now, and ZIP/JSON/CSV export + JSON/ZIP import |
 | `TopBar` | Search, favorites toggle, random, stop, record/stats/settings, sort tabs, grid-size selector |
 | `CategoryBar` | Color chips with counts + inline "new category" |
 | `Mixer` | Floating live mixer: per-voice volume/stop + master volume |

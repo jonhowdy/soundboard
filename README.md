@@ -35,7 +35,8 @@ design languages.
 | **Favorites** | Toggle + auto-pin to top |
 | **Hotkeys** | Assign `F1`, `Ctrl+1`, `Shift+A`, `Space`, custom combos; global listener |
 | **Recording** | Capture from mic/USB/Bluetooth (MediaRecorder), preview, name, save |
-| **Import/Export** | Drag-and-drop, file picker, MP3/WAV/AAC/M4A/OGG/FLAC/AIFF; full JSON backup with embedded audio |
+| **Import/Export** | Drag-and-drop, file picker, MP3/WAV/AAC/M4A/OGG/FLAC/AIFF; ZIP (manifest + audio), full JSON backup, CSV list; import from JSON or ZIP |
+| **Backup & restore** | Automatic daily backups with version history + one-tap restore, all stored locally |
 | **Random & queue** | Random from library/category/favorites |
 | **Sound packs** | Installable, versioned pack catalog (Retro Arcade, Drum Kit, Notifications, Podcast FX, Meme Classics); one-tap install/remove, all offline |
 | **Themes** | Dark, Light, Neon, Retro, Cyberpunk, Minimal (CSS-variable driven) |

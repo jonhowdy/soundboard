@@ -1,20 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { THEMES } from '../themes/themes';
 import type { ThemeId } from '../types';
 import { Modal, Toggle } from './ui';
-import type { BackupFile } from '../types';
 import { audioEngine } from '../audio/AudioEngine';
 import { isDesktop } from '../platform';
+import { BackupModal } from './BackupModal';
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const settings = useStore((s) => s.settings);
   const update = useStore((s) => s.updateSettings);
-  const exportBackup = useStore((s) => s.exportBackup);
-  const importBackup = useStore((s) => s.importBackup);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [backupOpen, setBackupOpen] = useState(false);
   const routingSupported = audioEngine.supportsOutputRouting();
 
   const refreshDevices = async () => {
@@ -32,30 +30,6 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   useEffect(() => {
     if (open && routingSupported) void audioEngine.listOutputDevices().then(setDevices);
   }, [open, routingSupported]);
-
-  const doExport = async () => {
-    const backup = await exportBackup();
-    const blob = new Blob([JSON.stringify(backup, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `soundboard-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const doImport = async (file: File) => {
-    try {
-      const backup = JSON.parse(await file.text()) as BackupFile;
-      if (backup.version !== 1) throw new Error('Unsupported backup version');
-      await importBackup(backup);
-      alert('Backup restored.');
-    } catch (e) {
-      alert(`Import failed: ${e instanceof Error ? e.message : 'invalid file'}`);
-    }
-  };
 
   return (
     <Modal open={open} onClose={onClose} title="Settings" wide>
@@ -174,31 +148,17 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
         <section>
           <h3 className="mb-2 text-sm font-bold text-muted">Backup &amp; data</h3>
-          <div className="space-y-2">
-            <button onClick={doExport} className="btn-accent w-full">
-              ⬇ Export backup (JSON)
-            </button>
-            <button onClick={() => fileRef.current?.click()} className="btn-ghost w-full border border-line">
-              ⬆ Import backup
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void doImport(f);
-                e.target.value = '';
-              }}
-            />
-          </div>
+          <button onClick={() => setBackupOpen(true)} className="btn-accent w-full">
+            🗄 Backup &amp; restore…
+          </button>
           <p className="mt-3 text-xs text-muted">
-            Everything is stored locally on your device (offline-first). Backups
-            include your audio so you can move between devices.
+            Daily automatic backups with version history, plus ZIP / JSON / CSV
+            export and import — all local to your device.
           </p>
         </section>
       </div>
+
+      <BackupModal open={backupOpen} onClose={() => setBackupOpen(false)} />
     </Modal>
   );
 }

@@ -8,7 +8,7 @@ store, and a thin end-to-end layer that drives the real browser.
 - **@testing-library/react** — component tests (render, query by role/label).
 - **Playwright** — e2e against the production preview, `npm run e2e`.
 
-## What's covered today (`src/test`, 47 tests, all green)
+## What's covered today (`src/test`, 52 tests, all green)
 
 | Suite | Layer | Verifies |
 |-------|-------|----------|
@@ -21,6 +21,7 @@ store, and a thin end-to-end layer that drives the real browser.
 | `globalHotkeys.test.ts` | unit | Desktop accelerator conversion (modifier mapping, F-keys, Space, null when no key) |
 | `queue.test.ts` | unit + integration | `moveItem`/`chunk` pure helpers; store queue reducers (add/reorder/remove/clear, duplicates) |
 | `packs.test.ts` | unit | Catalog integrity (unique ids, real synth keys, required fields) + valid WAV render for every pack sound |
+| `backup.test.ts` | unit | ZIP round-trip (manifest + audio), CSV header/escaping, backup pruning (auto cap, manual retention) |
 | `store.filter.test.ts` | integration | `visibleSounds` search across title/tag/category, category & favorites filters, sort, favorite pinning |
 
 Run: `npm test` · watch: `npm run test:watch` · UI: `npm run test:ui`.

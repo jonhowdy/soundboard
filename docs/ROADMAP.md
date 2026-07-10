@@ -72,9 +72,15 @@ gridSize×gridSize screens with **swipe** (touch), on-screen arrows and page dot
 — this is the mobile shell's swipe-between-pages. *Verified in-browser: 2×2 grid
 → 3 pages, queue of 3 plays with highlight, 0 console errors; 8 new tests.*
 
-## 🔜 M6 — Backup & resilience
-Automatic daily local backups with version history + one-tap restore. ZIP and CSV
-exports. Import from ZIP archives.
+## ✅ M6 — Backup & resilience *(done)*
+**Automatic daily backups** with **version history** (kept in a `backups`
+IndexedDB store, pruned to the newest 5 auto snapshots; manual backups always
+kept) and **one-tap restore**. Exports: **ZIP** (manifest + raw audio files via
+`fflate`), **JSON** (full embedded backup) and **CSV** (metadata list). Imports
+from **JSON or ZIP**. All local — nothing leaves the device.
+*Verified in-browser: auto backup fires on first load, "Back up now" adds a
+version, ZIP/CSV downloads succeed, restore works; 5 new tests (ZIP round-trip,
+CSV escaping, prune logic).*
 
 ## 🟡 M7 — Personalization & packs *(packs done)*
 **Done:** installable, versioned **sound packs** with an in-app catalog — 5 built-in

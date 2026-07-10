@@ -20,6 +20,16 @@ import { buildSeed } from '../data/seed';
 import { PACKS } from '../data/packs';
 import { SYNTH_SOUNDS } from '../utils/synth';
 import {
+  buildCsv,
+  buildLibraryZip,
+  parseLibraryZip,
+  pruneBackups,
+  summarize,
+  audioPath,
+  type BackupSummary,
+  type ZipManifest,
+} from '../utils/backup';
+import {
   arrayBufferToDataUrl,
   dataUrlToArrayBuffer,
   formatFromName,
@@ -93,6 +103,15 @@ interface State {
   // backup
   exportBackup: () => Promise<BackupFile>;
   importBackup: (backup: BackupFile) => Promise<void>;
+  exportCsv: () => string;
+  exportZipBytes: () => Promise<Uint8Array>;
+  importZip: (bytes: Uint8Array) => Promise<void>;
+
+  // version history
+  backups: BackupSummary[];
+  createBackupSnapshot: (auto: boolean, label?: string) => Promise<void>;
+  restoreBackup: (id: string) => Promise<void>;
+  removeBackup: (id: string) => Promise<void>;
 
   // derived
   visibleSounds: () => Sound[];
@@ -125,6 +144,7 @@ export const useStore = create<State>((set, get) => ({
   sort: 'recent',
   editingSoundId: null,
   installedPacks: [],
+  backups: [],
 
   init: async () => {
     // Wire the engine → store bridge for the live mixer.
@@ -147,13 +167,31 @@ export const useStore = create<State>((set, get) => ({
       await storage.setFlag('seeded', true);
     }
 
-    const [sounds, categories, installedPacks] = await Promise.all([
+    const [sounds, categories, installedPacks, backups] = await Promise.all([
       storage.getSounds(),
       storage.getCategories(),
       storage.getMeta<string[]>('installedPacks'),
+      storage.getMeta<BackupSummary[]>('backupIndex'),
     ]);
 
-    set({ sounds, categories, settings, installedPacks: installedPacks ?? [], ready: true });
+    set({
+      sounds,
+      categories,
+      settings,
+      installedPacks: installedPacks ?? [],
+      backups: backups ?? [],
+      ready: true,
+    });
+
+    // Automatic daily backup: snapshot once every 24h if there's anything to save.
+    void (async () => {
+      const DAY = 24 * 60 * 60 * 1000;
+      const last = (await storage.getMeta<number>('lastAutoBackup')) ?? 0;
+      if (sounds.length > 0 && Date.now() - last > DAY) {
+        await get().createBackupSnapshot(true);
+        await storage.setMeta('lastAutoBackup', Date.now());
+      }
+    })();
 
     // Decode buffers in the background so first taps are instant.
     void (async () => {
@@ -582,6 +620,76 @@ export const useStore = create<State>((set, get) => ({
       for (const c of backup.categories) catMap.set(c.id, c);
       return { sounds: [...map.values()], categories: [...catMap.values()] };
     });
+  },
+
+  exportCsv: () => buildCsv(get().sounds, get().categories),
+
+  exportZipBytes: async () => {
+    const { sounds, categories, settings } = get();
+    const audio: Record<string, Uint8Array> = {};
+    const manifestSounds: ZipManifest['sounds'] = [];
+    for (const s of sounds) {
+      const data = await storage.getBlob(s.blobKey);
+      const file = audioPath(s);
+      if (data) audio[file] = new Uint8Array(data);
+      manifestSounds.push({ ...s, file });
+    }
+    const manifest: ZipManifest = {
+      version: 1,
+      exportedAt: Date.now(),
+      settings,
+      categories,
+      sounds: manifestSounds,
+    };
+    return buildLibraryZip(manifest, audio);
+  },
+
+  importZip: async (bytes) => {
+    const { manifest, audio } = parseLibraryZip(bytes);
+    for (const c of manifest.categories) await storage.putCategory(c);
+    const restored: Sound[] = [];
+    for (const entry of manifest.sounds) {
+      const { file, ...sound } = entry;
+      const data = audio[file];
+      if (data) {
+        // Copy into a fresh ArrayBuffer so the stored blob owns its bytes.
+        await storage.putBlob(sound.blobKey, data.slice().buffer);
+      }
+      await storage.putSound(sound);
+      restored.push(sound);
+    }
+    get().updateSettings(manifest.settings);
+    set((st) => {
+      const map = new Map(st.sounds.map((x) => [x.id, x]));
+      for (const s of restored) map.set(s.id, s);
+      const catMap = new Map(st.categories.map((x) => [x.id, x]));
+      for (const c of manifest.categories) catMap.set(c.id, c);
+      return { sounds: [...map.values()], categories: [...catMap.values()] };
+    });
+  },
+
+  createBackupSnapshot: async (auto, label) => {
+    const backup = await get().exportBackup();
+    const id = `${backup.exportedAt}-${nanoid(4)}`;
+    await storage.putBackup(id, backup);
+    const summary = summarize(id, backup, auto, label);
+    // Keep the newest few auto-backups; manual ones are always retained.
+    const { kept, removed } = pruneBackups([...get().backups, summary], 5);
+    for (const rid of removed) await storage.deleteBackup(rid);
+    await storage.setMeta('backupIndex', kept);
+    set({ backups: kept });
+  },
+
+  restoreBackup: async (id) => {
+    const backup = await storage.getBackup(id);
+    if (backup) await get().importBackup(backup);
+  },
+
+  removeBackup: async (id) => {
+    await storage.deleteBackup(id);
+    const backups = get().backups.filter((b) => b.id !== id);
+    await storage.setMeta('backupIndex', backups);
+    set({ backups });
   },
 
   visibleSounds: () => {

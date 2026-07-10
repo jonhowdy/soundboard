@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Category, Settings, Sound } from '../types';
+import type { BackupFile, Category, Settings, Sound } from '../types';
 
 /**
  * Offline-first persistence.
@@ -12,11 +12,12 @@ interface SoundboardDB extends DBSchema {
   sounds: { key: string; value: Sound };
   categories: { key: string; value: Category };
   blobs: { key: string; value: ArrayBuffer };
+  backups: { key: string; value: BackupFile };
   meta: { key: string; value: unknown };
 }
 
 const DB_NAME = 'soundboard';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<SoundboardDB>> | null = null;
 
@@ -32,6 +33,9 @@ function db(): Promise<IDBPDatabase<SoundboardDB>> {
           database.createObjectStore('blobs');
         if (!database.objectStoreNames.contains('meta'))
           database.createObjectStore('meta');
+        // v2: version-history backups.
+        if (!database.objectStoreNames.contains('backups'))
+          database.createObjectStore('backups');
       },
     });
   }
@@ -88,6 +92,16 @@ export const storage = {
   },
   async setMeta<T>(key: string, value: T): Promise<void> {
     await (await db()).put('meta', value, key);
+  },
+
+  async getBackup(id: string): Promise<BackupFile | undefined> {
+    return (await db()).get('backups', id);
+  },
+  async putBackup(id: string, backup: BackupFile): Promise<void> {
+    await (await db()).put('backups', backup, id);
+  },
+  async deleteBackup(id: string): Promise<void> {
+    await (await db()).delete('backups', id);
   },
 
   async clearAll(): Promise<void> {
