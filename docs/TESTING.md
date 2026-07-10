@@ -1,7 +1,8 @@
 # Testing strategy
 
 A classic pyramid: many fast unit tests, a layer of integration tests around the
-store, and a thin end-to-end layer that drives the real browser.
+store, and an end-to-end layer that drives the real browser. **52 unit/integration
+tests (Vitest) + 12 end-to-end tests (Playwright), all green.**
 
 ## Tooling
 - **Vitest** (jsdom) — unit + integration, `npm test`.
@@ -45,31 +46,32 @@ Run: `npm test` · watch: `npm run test:watch` · UI: `npm run test:ui`.
 - **Audio engine with a mocked AudioContext**: assert graph wiring, fade ramps
   scheduled, `stopAll` disconnects, reversed-buffer caching.
 
-## End-to-end (Playwright)
-A smoke flow already validated manually during the build:
-load → 12 buttons render → click plays → mixer appears → open settings → search
-filters → **zero console errors**. Formalize as `e2e/board.spec.ts`:
+## End-to-end (Playwright) — `e2e/`, 12 tests, all green
 
-```ts
-import { test, expect } from '@playwright/test';
+Run against a production build served by `vite preview` (config in
+`playwright.config.ts`, `npm run e2e`). Every major user flow is covered:
 
-test('play, filter and configure the board', async ({ page }) => {
-  await page.goto('/');
-  await page.waitForSelector('button[aria-label^="Play"]');
-  const buttons = page.locator('button[aria-label^="Play"]');
-  expect(await buttons.count()).toBeGreaterThan(0);
-  await buttons.first().click();
-  await expect(page.getByText(/playing/)).toBeVisible();     // mixer
-  await page.fill('input[aria-label="Search sounds"]', 'horn');
-  await expect(buttons).toHaveCount(1);
-});
-```
+| Spec | Flow verified |
+|------|---------------|
+| `board.spec.ts` | Seeds 12 sounds; play → live mixer; search filter; favorites filter; category filter |
+| `pagination.spec.ts` | 2×2 → 3 pages; Next + page-dot navigation; `1/3` → `3/3` |
+| `queue.spec.ts` | Add 3 from picker; remove; **play-all auto-advances back to idle**; clear |
+| `packs.spec.ts` | Install a pack (library 12 → 18); "Installed" badge; remove reverts |
+| `backup.spec.ts` | Auto-daily backup present on load; manual backup adds a version; CSV **download**; restore |
+| `editor.spec.ts` | Right-click → editor; AI auto-style; **trim & apply**; theme switch updates `data-theme` |
 
-> Note: this environment's pre-installed Chromium lives at
-> `/opt/pw-browsers/chromium`; set `executablePath` (or
-> `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`) rather than running `playwright install`.
+Playwright uses web-first (auto-retrying) assertions, and each test runs in a
+fresh browser context so IndexedDB starts empty and the board re-seeds
+deterministically.
+
+> Browser binary: locally the config points `executablePath` at the preinstalled
+> `/opt/pw-browsers/chromium`; in CI `npx playwright install chromium` provides
+> it and the override is skipped (the config detects this automatically).
 
 ## CI gate
-`.github/workflows/ci.yml` runs **typecheck → unit/integration tests → production
-build** on every push/PR and uploads the web build. Add the Playwright job once
-`e2e/` exists. A PR must be green to merge.
+`.github/workflows/ci.yml` runs three jobs on every push/PR:
+1. **build-and-test** — typecheck → unit/integration (Vitest) → production build → upload web build.
+2. **e2e** — install Chromium → Playwright suite → upload the HTML report.
+3. **desktop** — install WebKitGTK deps → `cargo build` the Tauri app.
+
+A PR must be green to merge.
