@@ -82,17 +82,20 @@ from **JSON or ZIP**. All local — nothing leaves the device.
 version, ZIP/CSV downloads succeed, restore works; 5 new tests (ZIP round-trip,
 CSV escaping, prune logic).*
 
-## 🟡 M7 — Personalization & packs *(packs done)*
-**Done:** installable, versioned **sound packs** with an in-app catalog — 5 built-in
-packs (Retro Arcade, Drum Kit, Notifications, Podcast FX, Meme Classics), each
-rendered **offline** from the synth palette and filed under its own category.
-One-tap install/remove, installed state persisted, per-sound preview.
-*Verified in-browser: install adds a pack's sounds (12 → 18) with a live count,
-remove reverts cleanly, 0 console errors; 6 new tests.*
+## 🟡 M7 — Personalization & packs *(packs + custom themes done)*
+**Sound packs:** installable, versioned catalog — 5 built-in packs (Retro Arcade,
+Drum Kit, Notifications, Podcast FX, Meme Classics), each rendered **offline** from
+the synth palette and filed under its own category. One-tap install/remove,
+installed state persisted, per-sound preview.
+**Custom themes:** users create/edit themes by tweaking the eight color tokens
+with a live preview; custom themes persist, appear in the picker alongside
+built-ins, and resolve through the same path (status-bar contrast auto-detected
+from the background luminance, so it works on mobile too).
+*Verified in-browser + e2e: install grows library 12 → 18; create-theme applies a
+`custom-*` theme and adds a picker swatch; 0 console errors; 12 new tests.*
 
-**Remaining:** user-created themes, favorite collections, and downloadable
-(network-fetched) third-party packs signed + cached on top of the same
-`SoundPack` shape.
+**Remaining:** favorite collections, and downloadable (network-fetched)
+third-party packs signed + cached on top of the same `SoundPack` shape.
 
 ## 🔜 M8 — Cloud sync (opt-in)
 Supabase auth + Postgres schema (see DATABASE.md), content-addressed encrypted

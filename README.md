@@ -39,7 +39,7 @@ design languages.
 | **Backup & restore** | Automatic daily backups with version history + one-tap restore, all stored locally |
 | **Random & queue** | Random from library/category/favorites |
 | **Sound packs** | Installable, versioned pack catalog (Retro Arcade, Drum Kit, Notifications, Podcast FX, Meme Classics); one-tap install/remove, all offline |
-| **Themes** | Dark, Light, Neon, Retro, Cyberpunk, Minimal (CSS-variable driven) |
+| **Themes** | Dark, Light, Neon, Retro, Cyberpunk, Minimal — plus a **custom theme editor** (8 color tokens, live preview) |
 | **Statistics** | Play counts, most/recently played, totals |
 | **Accessibility** | Keyboard nav, ARIA, large-text, high-contrast, color-blind mode, reduced-motion |
 | **Desktop (Tauri)** | Native shell wrapping the web build; OS-level global hotkeys (fire while unfocused) + output-device routing to OBS/Discord via virtual cable |

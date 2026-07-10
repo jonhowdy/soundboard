@@ -1,18 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { THEMES } from '../themes/themes';
-import type { ThemeId } from '../types';
+import type { CustomTheme, ThemeId } from '../types';
 import { Modal, Toggle } from './ui';
 import { audioEngine } from '../audio/AudioEngine';
 import { isDesktop } from '../platform';
 import { BackupModal } from './BackupModal';
+import { ThemeEditor } from './ThemeEditor';
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const settings = useStore((s) => s.settings);
   const update = useStore((s) => s.updateSettings);
+  const customThemes = useStore((s) => s.customThemes);
+  const deleteCustomTheme = useStore((s) => s.deleteCustomTheme);
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [backupOpen, setBackupOpen] = useState(false);
+  const [themeEditor, setThemeEditor] = useState<{ open: boolean; editing: CustomTheme | null }>({
+    open: false,
+    editing: null,
+  });
   const routingSupported = audioEngine.supportsOutputRouting();
 
   const refreshDevices = async () => {
@@ -35,30 +42,37 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     <Modal open={open} onClose={onClose} title="Settings" wide>
       <div className="grid gap-6 md:grid-cols-2">
         <section>
-          <h3 className="mb-2 text-sm font-bold text-muted">Theme</h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-muted">Theme</h3>
+            <button
+              onClick={() => setThemeEditor({ open: true, editing: null })}
+              className="btn-accent !px-2.5 !py-1 text-xs"
+            >
+              ＋ Create
+            </button>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(THEMES) as ThemeId[]).map((id) => (
-              <button
+              <ThemeSwatch
                 key={id}
+                label={THEMES[id].label}
+                colors={[THEMES[id].tokens.accent, THEMES[id].tokens.accent2, THEMES[id].tokens.surface]}
+                active={settings.theme === id}
                 onClick={() => update({ theme: id })}
-                className={
-                  'rounded-xl border-2 p-2 text-left transition-all ' +
-                  (settings.theme === id
-                    ? 'border-accent'
-                    : 'border-line hover:border-accent/50')
-                }
-              >
-                <div className="mb-1.5 flex gap-1">
-                  {(['accent', 'accent2', 'surface'] as const).map((k) => (
-                    <span
-                      key={k}
-                      className="h-4 w-4 rounded-full border border-black/20"
-                      style={{ background: `rgb(${THEMES[id].tokens[k]})` }}
-                    />
-                  ))}
-                </div>
-                <span className="text-xs font-semibold">{THEMES[id].label}</span>
-              </button>
+              />
+            ))}
+            {customThemes.map((t) => (
+              <ThemeSwatch
+                key={t.id}
+                label={t.label}
+                colors={[t.tokens.accent, t.tokens.accent2, t.tokens.surface]}
+                active={settings.theme === t.id}
+                onClick={() => update({ theme: t.id })}
+                onEdit={() => setThemeEditor({ open: true, editing: t })}
+                onDelete={() => {
+                  if (confirm(`Delete theme "${t.label}"?`)) deleteCustomTheme(t.id);
+                }}
+              />
             ))}
           </div>
         </section>
@@ -159,6 +173,72 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       </div>
 
       <BackupModal open={backupOpen} onClose={() => setBackupOpen(false)} />
+      {themeEditor.open && (
+        <ThemeEditor
+          editing={themeEditor.editing}
+          onClose={() => setThemeEditor({ open: false, editing: null })}
+        />
+      )}
     </Modal>
+  );
+}
+
+function ThemeSwatch({
+  label,
+  colors,
+  active,
+  onClick,
+  onEdit,
+  onDelete,
+}: {
+  label: string;
+  colors: [string, string, string];
+  active: boolean;
+  onClick: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <div
+      className={
+        'group relative rounded-xl border-2 p-2 transition-all ' +
+        (active ? 'border-accent' : 'border-line hover:border-accent/50')
+      }
+    >
+      <button onClick={onClick} className="w-full text-left" aria-pressed={active}>
+        <div className="mb-1.5 flex gap-1">
+          {colors.map((c, i) => (
+            <span
+              key={i}
+              className="h-4 w-4 rounded-full border border-black/20"
+              style={{ background: `rgb(${c})` }}
+            />
+          ))}
+        </div>
+        <span className="block truncate text-xs font-semibold">{label}</span>
+      </button>
+      {(onEdit || onDelete) && (
+        <div className="absolute right-1 top-1 hidden gap-0.5 group-hover:flex">
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              aria-label={`Edit ${label}`}
+              className="rounded bg-surface/90 px-1 text-xs hover:text-accent"
+            >
+              ✎
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              aria-label={`Delete ${label}`}
+              className="rounded bg-surface/90 px-1 text-xs hover:text-red-400"
+            >
+              🗑
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

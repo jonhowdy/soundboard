@@ -120,13 +120,33 @@ export type ThemeId =
   | 'cyberpunk'
   | 'minimal';
 
+/** The eight themeable color tokens, each an "R G B" triple string. */
+export interface ThemeTokens {
+  surface: string;
+  panel: string;
+  elevated: string;
+  ink: string;
+  muted: string;
+  accent: string;
+  accent2: string;
+  line: string;
+}
+
+/** A user-created theme, persisted alongside settings. */
+export interface CustomTheme {
+  id: string;
+  label: string;
+  tokens: ThemeTokens;
+}
+
 export type GridSize = 2 | 3 | 4 | 5 | 6;
 
 export type RandomScope = 'library' | 'category' | 'favorites';
 
 /** User-facing settings persisted across sessions. */
 export interface Settings {
-  theme: ThemeId;
+  /** Built-in ThemeId or a custom theme's id. */
+  theme: string;
   gridSize: GridSize;
   masterVolume: number;
   haptics: boolean;

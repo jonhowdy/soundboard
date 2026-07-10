@@ -1,15 +1,15 @@
 # Testing strategy
 
 A classic pyramid: many fast unit tests, a layer of integration tests around the
-store, and an end-to-end layer that drives the real browser. **52 unit/integration
-tests (Vitest) + 12 end-to-end tests (Playwright), all green.**
+store, and an end-to-end layer that drives the real browser. **59 unit/integration
+tests (Vitest) + 13 end-to-end tests (Playwright), all green.**
 
 ## Tooling
 - **Vitest** (jsdom) — unit + integration, `npm test`.
 - **@testing-library/react** — component tests (render, query by role/label).
 - **Playwright** — e2e against the production preview, `npm run e2e`.
 
-## What's covered today (`src/test`, 52 tests, all green)
+## What's covered today (`src/test`, 59 tests, all green)
 
 | Suite | Layer | Verifies |
 |-------|-------|----------|
@@ -23,6 +23,7 @@ tests (Vitest) + 12 end-to-end tests (Playwright), all green.**
 | `queue.test.ts` | unit + integration | `moveItem`/`chunk` pure helpers; store queue reducers (add/reorder/remove/clear, duplicates) |
 | `packs.test.ts` | unit | Catalog integrity (unique ids, real synth keys, required fields) + valid WAV render for every pack sound |
 | `backup.test.ts` | unit | ZIP round-trip (manifest + audio), CSV header/escaping, backup pruning (auto cap, manual retention) |
+| `themes.test.ts` | unit | hex↔triple round-trip, `resolveTokens` (built-in/custom/fallback), light-vs-dark detection |
 | `store.filter.test.ts` | integration | `visibleSounds` search across title/tag/category, category & favorites filters, sort, favorite pinning |
 
 Run: `npm test` · watch: `npm run test:watch` · UI: `npm run test:ui`.
@@ -59,6 +60,7 @@ Run against a production build served by `vite preview` (config in
 | `packs.spec.ts` | Install a pack (library 12 → 18); "Installed" badge; remove reverts |
 | `backup.spec.ts` | Auto-daily backup present on load; manual backup adds a version; CSV **download**; restore |
 | `editor.spec.ts` | Right-click → editor; AI auto-style; **trim & apply**; theme switch updates `data-theme` |
+| `themes.spec.ts` | Create a custom theme (name + accent), apply it (`data-theme=custom-*`), see its swatch |
 
 Playwright uses web-first (auto-retrying) assertions, and each test runs in a
 fresh browser context so IndexedDB starts empty and the board re-seeds

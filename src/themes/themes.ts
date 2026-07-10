@@ -1,22 +1,12 @@
-import type { ThemeId } from '../types';
+import type { CustomTheme, ThemeId, ThemeTokens } from '../types';
 
 /**
- * Theme definitions expressed as `R G B` triples (space separated) so Tailwind's
+ * Theme tokens are `R G B` triples (space separated) so Tailwind's
  * `rgb(var(--token) / <alpha>)` syntax can apply opacity. Applying a theme sets
- * these CSS variables on <html>.
+ * these CSS variables on <html>. Built-in themes live here; user-created themes
+ * share the exact same token shape and resolve through the same path.
  */
-type Tokens = {
-  surface: string;
-  panel: string;
-  elevated: string;
-  ink: string;
-  muted: string;
-  accent: string;
-  accent2: string;
-  line: string;
-};
-
-export const THEMES: Record<ThemeId, { label: string; tokens: Tokens }> = {
+export const THEMES: Record<ThemeId, { label: string; tokens: ThemeTokens }> = {
   dark: {
     label: 'Dark',
     tokens: {
@@ -97,10 +87,30 @@ export const THEMES: Record<ThemeId, { label: string; tokens: Tokens }> = {
   },
 };
 
-export function applyTheme(id: ThemeId): void {
-  const theme = THEMES[id];
+export const TOKEN_LABELS: { key: keyof ThemeTokens; label: string }[] = [
+  { key: 'surface', label: 'Background' },
+  { key: 'panel', label: 'Panel' },
+  { key: 'elevated', label: 'Elevated' },
+  { key: 'ink', label: 'Text' },
+  { key: 'muted', label: 'Muted text' },
+  { key: 'accent', label: 'Accent' },
+  { key: 'accent2', label: 'Accent 2' },
+  { key: 'line', label: 'Lines' },
+];
+
+function isBuiltIn(id: string): id is ThemeId {
+  return Object.prototype.hasOwnProperty.call(THEMES, id);
+}
+
+/** Resolve a theme id (built-in or custom) to its tokens, with a safe fallback. */
+export function resolveTokens(id: string, custom: CustomTheme[] = []): ThemeTokens {
+  if (isBuiltIn(id)) return THEMES[id].tokens;
+  return custom.find((c) => c.id === id)?.tokens ?? THEMES.cyberpunk.tokens;
+}
+
+export function applyTheme(id: string, custom: CustomTheme[] = []): void {
+  const t = resolveTokens(id, custom);
   const root = document.documentElement;
-  const t = theme.tokens;
   root.style.setProperty('--sb-surface', t.surface);
   root.style.setProperty('--sb-panel', t.panel);
   root.style.setProperty('--sb-elevated', t.elevated);
@@ -110,4 +120,31 @@ export function applyTheme(id: ThemeId): void {
   root.style.setProperty('--sb-accent2', t.accent2);
   root.style.setProperty('--sb-line', t.line);
   root.dataset.theme = id;
+}
+
+/** Whether a theme's background is light (used for status-bar contrast). */
+export function isTokensLight(tokens: ThemeTokens): boolean {
+  const [r, g, b] = tokens.surface.split(/\s+/).map(Number) as [number, number, number];
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
+}
+
+export function isThemeLight(id: string, custom: CustomTheme[] = []): boolean {
+  return isTokensLight(resolveTokens(id, custom));
+}
+
+// --- hex <-> "R G B" triple conversion for the color-picker UI -----------------
+
+export function tripleToHex(triple: string): string {
+  const [r, g, b] = triple.split(/\s+/).map(Number);
+  const h = (n: number) => Math.max(0, Math.min(255, n | 0)).toString(16).padStart(2, '0');
+  return `#${h(r ?? 0)}${h(g ?? 0)}${h(b ?? 0)}`;
+}
+
+export function hexToTriple(hex: string): string {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const r = parseInt(full.slice(0, 2), 16) || 0;
+  const g = parseInt(full.slice(2, 4), 16) || 0;
+  const b = parseInt(full.slice(4, 6), 16) || 0;
+  return `${r} ${g} ${b}`;
 }

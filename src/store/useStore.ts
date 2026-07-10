@@ -4,9 +4,11 @@ import type {
   ActiveVoice,
   BackupFile,
   Category,
+  CustomTheme,
   RandomScope,
   Settings,
   Sound,
+  ThemeTokens,
 } from '../types';
 import { DEFAULT_PLAYBACK, DEFAULT_SETTINGS } from '../types';
 import { storage } from '../db/database';
@@ -15,7 +17,7 @@ import type { Pcm } from '../audio/edit';
 import { encodeWav } from '../utils/wav';
 import { hapticTap } from '../platform/haptics';
 import { syncStatusBar } from '../platform/native';
-import { applyTheme } from '../themes/themes';
+import { applyTheme, isThemeLight } from '../themes/themes';
 import { buildSeed } from '../data/seed';
 import { PACKS } from '../data/packs';
 import { SYNTH_SOUNDS } from '../utils/synth';
@@ -93,6 +95,12 @@ interface State {
   updateSettings: (patch: Partial<Settings>) => void;
   setVoiceVolume: (voiceId: string, v: number) => void;
 
+  // custom themes
+  customThemes: CustomTheme[];
+  addCustomTheme: (label: string, tokens: ThemeTokens) => CustomTheme;
+  updateCustomTheme: (id: string, patch: Partial<Omit<CustomTheme, 'id'>>) => void;
+  deleteCustomTheme: (id: string) => void;
+
   // filter setters
   setSearch: (s: string) => void;
   setActiveCategory: (id: string | null) => void;
@@ -145,6 +153,7 @@ export const useStore = create<State>((set, get) => ({
   editingSoundId: null,
   installedPacks: [],
   backups: [],
+  customThemes: [],
 
   init: async () => {
     // Wire the engine → store bridge for the live mixer.
@@ -152,7 +161,8 @@ export const useStore = create<State>((set, get) => ({
 
     let settings = (await storage.getSettings()) ?? DEFAULT_SETTINGS;
     settings = { ...DEFAULT_SETTINGS, ...settings };
-    applyTheme(settings.theme);
+    const customThemes = (await storage.getMeta<CustomTheme[]>('customThemes')) ?? [];
+    applyTheme(settings.theme, customThemes);
     audioEngine.setMasterVolume(settings.masterVolume);
     if (settings.outputDeviceId) void audioEngine.setOutputDevice(settings.outputDeviceId);
 
@@ -178,6 +188,7 @@ export const useStore = create<State>((set, get) => ({
       sounds,
       categories,
       settings,
+      customThemes,
       installedPacks: installedPacks ?? [],
       backups: backups ?? [],
       ready: true,
@@ -565,8 +576,9 @@ export const useStore = create<State>((set, get) => ({
     const settings = { ...get().settings, ...patch };
     void storage.putSettings(settings);
     if (patch.theme) {
-      applyTheme(patch.theme);
-      void syncStatusBar(patch.theme);
+      const custom = get().customThemes;
+      applyTheme(patch.theme, custom);
+      void syncStatusBar(isThemeLight(patch.theme, custom));
     }
     if (patch.masterVolume !== undefined)
       audioEngine.setMasterVolume(patch.masterVolume);
@@ -576,6 +588,32 @@ export const useStore = create<State>((set, get) => ({
   },
 
   setVoiceVolume: (voiceId, v) => audioEngine.setVoiceVolume(voiceId, v),
+
+  addCustomTheme: (label, tokens) => {
+    const theme: CustomTheme = { id: `custom-${nanoid(6)}`, label, tokens };
+    const customThemes = [...get().customThemes, theme];
+    void storage.setMeta('customThemes', customThemes);
+    set({ customThemes });
+    return theme;
+  },
+
+  updateCustomTheme: (id, patch) => {
+    const customThemes = get().customThemes.map((t) =>
+      t.id === id ? { ...t, ...patch } : t,
+    );
+    void storage.setMeta('customThemes', customThemes);
+    set({ customThemes });
+    // Re-apply live if the edited theme is the active one.
+    if (get().settings.theme === id) applyTheme(id, customThemes);
+  },
+
+  deleteCustomTheme: (id) => {
+    const customThemes = get().customThemes.filter((t) => t.id !== id);
+    void storage.setMeta('customThemes', customThemes);
+    set({ customThemes });
+    // If the deleted theme was active, fall back to a built-in.
+    if (get().settings.theme === id) get().updateSettings({ theme: 'cyberpunk' });
+  },
 
   setSearch: (search) => set({ search }),
   setActiveCategory: (activeCategory) => set({ activeCategory }),

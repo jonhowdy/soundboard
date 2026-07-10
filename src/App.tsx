@@ -5,6 +5,7 @@ import { useHotkeys } from './hooks/useHotkeys';
 import { isTauri, isCapacitor } from './platform';
 import { syncGlobalHotkeys, clearGlobalHotkeys } from './platform/globalHotkeys';
 import { initNative } from './platform/native';
+import { isThemeLight } from './themes/themes';
 import { isSupportedAudioFile } from './utils/audioFiles';
 import { TopBar } from './components/TopBar';
 import { CategoryBar } from './components/CategoryBar';
@@ -53,7 +54,8 @@ export function App() {
   // Mobile (Capacitor): status-bar styling + hardware back-button handling.
   useEffect(() => {
     if (!isCapacitor()) return;
-    void initNative(useStore.getState().settings.theme, () => backRef.current());
+    const { settings, customThemes } = useStore.getState();
+    void initNative(isThemeLight(settings.theme, customThemes), () => backRef.current());
   }, []);
 
   // Desktop: mirror sound hotkeys into OS-level global shortcuts and keep them
