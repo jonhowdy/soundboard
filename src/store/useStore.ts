@@ -1,0 +1,781 @@
+import { create } from 'zustand';
+import { nanoid } from 'nanoid';
+import type {
+  ActiveVoice,
+  BackupFile,
+  Category,
+  CustomTheme,
+  RandomScope,
+  Settings,
+  Sound,
+  ThemeTokens,
+} from '../types';
+import { DEFAULT_PLAYBACK, DEFAULT_SETTINGS } from '../types';
+import { storage } from '../db/database';
+import { audioEngine, AudioEngine } from '../audio/AudioEngine';
+import type { Pcm } from '../audio/edit';
+import { encodeWav } from '../utils/wav';
+import { hapticTap } from '../platform/haptics';
+import { syncStatusBar } from '../platform/native';
+import { applyTheme, isThemeLight } from '../themes/themes';
+import { buildSeed } from '../data/seed';
+import { PACKS } from '../data/packs';
+import { SYNTH_SOUNDS } from '../utils/synth';
+import {
+  buildCsv,
+  buildLibraryZip,
+  parseLibraryZip,
+  pruneBackups,
+  summarize,
+  audioPath,
+  type BackupSummary,
+  type ZipManifest,
+} from '../utils/backup';
+import {
+  arrayBufferToDataUrl,
+  dataUrlToArrayBuffer,
+  formatFromName,
+  titleFromName,
+} from '../utils/audioFiles';
+
+export type SortKey = 'recent' | 'name' | 'played' | 'created';
+
+interface State {
+  ready: boolean;
+  sounds: Sound[];
+  categories: Category[];
+  settings: Settings;
+  activeVoices: ActiveVoice[];
+
+  // UI / filter state
+  search: string;
+  activeCategory: string | null; // null = all
+  favoritesOnly: boolean;
+  sort: SortKey;
+  editingSoundId: string | null;
+
+  // lifecycle
+  init: () => Promise<void>;
+
+  // playback
+  playSound: (id: string) => void;
+  stopSound: (id: string) => void;
+  stopAll: () => void;
+  playRandom: (scope: RandomScope) => void;
+
+  // queue
+  queue: string[];
+  queuePlaying: boolean;
+  queueIndex: number;
+  addToQueue: (id: string) => void;
+  removeFromQueue: (index: number) => void;
+  moveInQueue: (index: number, dir: -1 | 1) => void;
+  clearQueue: () => void;
+  playQueue: () => void;
+  stopQueue: () => void;
+
+  // CRUD
+  importFiles: (files: FileList | File[]) => Promise<void>;
+  addRecording: (blob: Blob, title: string) => Promise<void>;
+  updateSound: (id: string, patch: Partial<Sound>) => void;
+  ensureSoundLoaded: (id: string) => Promise<boolean>;
+  applyAudioEdit: (id: string, pcm: Pcm) => Promise<void>;
+  deleteSound: (id: string) => Promise<void>;
+  duplicateSound: (id: string) => Promise<void>;
+  toggleFavorite: (id: string) => void;
+
+  addCategory: (name: string, color: string, emoji?: string) => void;
+  deleteCategory: (id: string) => Promise<void>;
+
+  // sound packs
+  installedPacks: string[];
+  installPack: (packId: string) => Promise<void>;
+  uninstallPack: (packId: string) => Promise<void>;
+
+  updateSettings: (patch: Partial<Settings>) => void;
+  setVoiceVolume: (voiceId: string, v: number) => void;
+
+  // custom themes
+  customThemes: CustomTheme[];
+  addCustomTheme: (label: string, tokens: ThemeTokens) => CustomTheme;
+  updateCustomTheme: (id: string, patch: Partial<Omit<CustomTheme, 'id'>>) => void;
+  deleteCustomTheme: (id: string) => void;
+
+  // filter setters
+  setSearch: (s: string) => void;
+  setActiveCategory: (id: string | null) => void;
+  setFavoritesOnly: (v: boolean) => void;
+  setSort: (s: SortKey) => void;
+  setEditingSound: (id: string | null) => void;
+
+  // backup
+  exportBackup: () => Promise<BackupFile>;
+  importBackup: (backup: BackupFile) => Promise<void>;
+  exportCsv: () => string;
+  exportZipBytes: () => Promise<Uint8Array>;
+  importZip: (bytes: Uint8Array) => Promise<void>;
+
+  // version history
+  backups: BackupSummary[];
+  createBackupSnapshot: (auto: boolean, label?: string) => Promise<void>;
+  restoreBackup: (id: string) => Promise<void>;
+  removeBackup: (id: string) => Promise<void>;
+
+  // derived
+  visibleSounds: () => Sound[];
+}
+
+/** Ensure a sound's audio is decoded, then compute duration + waveform once. */
+async function ensureLoaded(sound: Sound): Promise<Partial<Sound> | null> {
+  if (audioEngine.isLoaded(sound.id)) return null;
+  const data = await storage.getBlob(sound.blobKey);
+  if (!data) return null;
+  const buffer = await audioEngine.load(sound.id, data);
+  if (sound.duration === 0 || sound.waveform.length === 0) {
+    return {
+      duration: buffer.duration,
+      waveform: AudioEngine.computeWaveform(buffer),
+    };
+  }
+  return null;
+}
+
+export const useStore = create<State>((set, get) => ({
+  ready: false,
+  sounds: [],
+  categories: [],
+  settings: DEFAULT_SETTINGS,
+  activeVoices: [],
+  search: '',
+  activeCategory: null,
+  favoritesOnly: false,
+  sort: 'recent',
+  editingSoundId: null,
+  installedPacks: [],
+  backups: [],
+  customThemes: [],
+
+  init: async () => {
+    // Wire the engine → store bridge for the live mixer.
+    audioEngine.onVoicesChanged = (voices) => set({ activeVoices: voices });
+
+    let settings = (await storage.getSettings()) ?? DEFAULT_SETTINGS;
+    settings = { ...DEFAULT_SETTINGS, ...settings };
+    const customThemes = (await storage.getMeta<CustomTheme[]>('customThemes')) ?? [];
+    applyTheme(settings.theme, customThemes);
+    audioEngine.setMasterVolume(settings.masterVolume);
+    if (settings.outputDeviceId) void audioEngine.setOutputDevice(settings.outputDeviceId);
+
+    const seeded = await storage.getFlag('seeded');
+    if (!seeded) {
+      const { categories, sounds } = buildSeed();
+      for (const c of categories) await storage.putCategory(c);
+      for (const { sound, audio } of sounds) {
+        await storage.putBlob(sound.blobKey, audio);
+        await storage.putSound(sound);
+      }
+      await storage.setFlag('seeded', true);
+    }
+
+    const [sounds, categories, installedPacks, backups] = await Promise.all([
+      storage.getSounds(),
+      storage.getCategories(),
+      storage.getMeta<string[]>('installedPacks'),
+      storage.getMeta<BackupSummary[]>('backupIndex'),
+    ]);
+
+    set({
+      sounds,
+      categories,
+      settings,
+      customThemes,
+      installedPacks: installedPacks ?? [],
+      backups: backups ?? [],
+      ready: true,
+    });
+
+    // Automatic daily backup: snapshot once every 24h if there's anything to save.
+    void (async () => {
+      const DAY = 24 * 60 * 60 * 1000;
+      const last = (await storage.getMeta<number>('lastAutoBackup')) ?? 0;
+      if (sounds.length > 0 && Date.now() - last > DAY) {
+        await get().createBackupSnapshot(true);
+        await storage.setMeta('lastAutoBackup', Date.now());
+      }
+    })();
+
+    // Decode buffers in the background so first taps are instant.
+    void (async () => {
+      for (const s of sounds) {
+        const patch = await ensureLoaded(s);
+        if (patch) {
+          const next = { ...s, ...patch };
+          await storage.putSound(next);
+          set((st) => ({
+            sounds: st.sounds.map((x) => (x.id === s.id ? next : x)),
+          }));
+        }
+      }
+    })();
+  },
+
+  playSound: (id) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (!sound) return;
+    audioEngine.unlock();
+
+    const start = () => {
+      audioEngine.play(id, sound.playback, { title: sound.title });
+      const next: Sound = {
+        ...sound,
+        playCount: sound.playCount + 1,
+        lastPlayed: Date.now(),
+      };
+      void storage.putSound(next);
+      set((st) => ({ sounds: st.sounds.map((s) => (s.id === id ? next : s)) }));
+      if (get().settings.haptics) hapticTap();
+    };
+
+    if (!audioEngine.isLoaded(id)) {
+      void ensureLoaded(sound).then(start);
+    } else {
+      start();
+    }
+  },
+
+  stopSound: (id) => audioEngine.stopSound(id),
+  stopAll: () => {
+    get().stopQueue();
+    audioEngine.stopAll();
+  },
+
+  queue: [],
+  queuePlaying: false,
+  queueIndex: 0,
+
+  addToQueue: (id) => set((st) => ({ queue: [...st.queue, id] })),
+  removeFromQueue: (index) =>
+    set((st) => ({ queue: st.queue.filter((_, i) => i !== index) })),
+  moveInQueue: (index, dir) =>
+    set((st) => ({ queue: moveItem(st.queue, index, index + dir) })),
+  clearQueue: () => {
+    get().stopQueue();
+    set({ queue: [] });
+  },
+
+  playQueue: () => {
+    const { queue } = get();
+    if (queue.length === 0) return;
+    audioEngine.unlock();
+    set({ queuePlaying: true, queueIndex: 0 });
+
+    // Advance through the queue one sound at a time; each sound's `onEnded`
+    // schedules the next. Looping is forced off so the queue can progress.
+    const step = async (i: number) => {
+      const st = get();
+      if (!st.queuePlaying || i >= st.queue.length) {
+        set({ queuePlaying: false, queueIndex: 0 });
+        return;
+      }
+      set({ queueIndex: i });
+      const id = st.queue[i]!;
+      const sound = st.sounds.find((s) => s.id === id);
+      if (!sound) return void step(i + 1);
+      await get().ensureSoundLoaded(id);
+      if (!get().queuePlaying) return; // stopped while decoding
+      const next: Sound = {
+        ...sound,
+        playCount: sound.playCount + 1,
+        lastPlayed: Date.now(),
+      };
+      void storage.putSound(next);
+      set((s) => ({ sounds: s.sounds.map((x) => (x.id === id ? next : x)) }));
+      audioEngine.play(id, sound.playback, { title: sound.title }, {
+        forceNoLoop: true,
+        onEnded: () => void step(i + 1),
+      });
+    };
+    void step(0);
+  },
+
+  stopQueue: () => {
+    if (get().queuePlaying) {
+      set({ queuePlaying: false, queueIndex: 0 });
+      audioEngine.stopAll();
+    }
+  },
+
+  playRandom: (scope) => {
+    const { sounds, activeCategory } = get();
+    let pool = sounds;
+    if (scope === 'favorites') pool = sounds.filter((s) => s.favorite);
+    else if (scope === 'category' && activeCategory)
+      pool = sounds.filter((s) => s.categoryId === activeCategory);
+    if (pool.length === 0) return;
+    const pick = pool[Math.floor(Math.random() * pool.length)]!;
+    get().playSound(pick.id);
+  },
+
+  importFiles: async (files) => {
+    const list = Array.from(files);
+    const added: Sound[] = [];
+    for (const file of list) {
+      const buf = await file.arrayBuffer();
+      const blobKey = nanoid();
+      await storage.putBlob(blobKey, buf);
+      let duration = 0;
+      let waveform: number[] = [];
+      try {
+        const id = nanoid();
+        const buffer = await audioEngine.load(id, buf);
+        duration = buffer.duration;
+        waveform = AudioEngine.computeWaveform(buffer);
+        audioEngine.unload(id);
+      } catch {
+        /* undecodable formats still import; decode lazily later */
+      }
+      const sound: Sound = {
+        id: nanoid(),
+        title: titleFromName(file.name),
+        color: pickColor(added.length),
+        emoji: '🔊',
+        categoryId: get().activeCategory,
+        tags: [],
+        favorite: false,
+        format: formatFromName(file.name),
+        duration,
+        waveform,
+        playback: { ...DEFAULT_PLAYBACK },
+        playMode: 'oneshot',
+        playCount: 0,
+        lastPlayed: null,
+        createdAt: Date.now() + added.length,
+        blobKey,
+      };
+      await storage.putSound(sound);
+      // Move the decoded buffer under the final id.
+      if (duration > 0) await audioEngine.load(sound.id, buf);
+      added.push(sound);
+    }
+    set((st) => ({ sounds: [...st.sounds, ...added] }));
+  },
+
+  addRecording: async (blob, title) => {
+    const buf = await blob.arrayBuffer();
+    const blobKey = nanoid();
+    await storage.putBlob(blobKey, buf);
+    const id = nanoid();
+    let duration = 0;
+    let waveform: number[] = [];
+    try {
+      const buffer = await audioEngine.load(id, buf);
+      duration = buffer.duration;
+      waveform = AudioEngine.computeWaveform(buffer);
+    } catch {
+      /* ignore */
+    }
+    const sound: Sound = {
+      id,
+      title: title || 'Recording',
+      subtitle: 'Recorded',
+      color: '#ef4444',
+      emoji: '🎙️',
+      categoryId: get().activeCategory,
+      tags: ['recording'],
+      favorite: false,
+      format: 'wav',
+      duration,
+      waveform,
+      playback: { ...DEFAULT_PLAYBACK },
+      playMode: 'oneshot',
+      playCount: 0,
+      lastPlayed: null,
+      createdAt: Date.now(),
+      blobKey,
+    };
+    await storage.putSound(sound);
+    set((st) => ({ sounds: [...st.sounds, sound] }));
+  },
+
+  updateSound: (id, patch) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (!sound) return;
+    const next = { ...sound, ...patch };
+    void storage.putSound(next);
+    set((st) => ({ sounds: st.sounds.map((s) => (s.id === id ? next : s)) }));
+  },
+
+  ensureSoundLoaded: async (id) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (!sound) return false;
+    if (audioEngine.isLoaded(id)) return true;
+    const patch = await ensureLoaded(sound);
+    if (patch) {
+      const next = { ...sound, ...patch };
+      await storage.putSound(next);
+      set((st) => ({ sounds: st.sounds.map((s) => (s.id === id ? next : s)) }));
+    }
+    return audioEngine.isLoaded(id);
+  },
+
+  applyAudioEdit: async (id, pcm) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (!sound) return;
+    audioEngine.stopSound(id);
+    // Re-encode the edited audio to WAV, replace the blob under the same key,
+    // swap the cached buffer, and refresh derived duration + waveform.
+    const wav = encodeWav(pcm.channels, pcm.sampleRate);
+    await storage.putBlob(sound.blobKey, wav);
+    const buffer = audioEngine.setPcm(id, pcm);
+    const next: Sound = {
+      ...sound,
+      format: 'wav',
+      duration: buffer.duration,
+      waveform: AudioEngine.computeWaveform(buffer),
+    };
+    await storage.putSound(next);
+    set((st) => ({ sounds: st.sounds.map((s) => (s.id === id ? next : s)) }));
+  },
+
+  deleteSound: async (id) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (!sound) return;
+    audioEngine.stopSound(id);
+    audioEngine.unload(id);
+    await storage.deleteSound(id);
+    await storage.deleteBlob(sound.blobKey);
+    set((st) => ({
+      sounds: st.sounds.filter((s) => s.id !== id),
+      queue: st.queue.filter((qid) => qid !== id),
+    }));
+  },
+
+  duplicateSound: async (id) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (!sound) return;
+    const data = await storage.getBlob(sound.blobKey);
+    if (!data) return;
+    const blobKey = nanoid();
+    await storage.putBlob(blobKey, data);
+    const copy: Sound = {
+      ...sound,
+      id: nanoid(),
+      title: `${sound.title} copy`,
+      hotkey: undefined,
+      favorite: false,
+      playCount: 0,
+      lastPlayed: null,
+      createdAt: Date.now(),
+      blobKey,
+    };
+    await storage.putSound(copy);
+    set((st) => ({ sounds: [...st.sounds, copy] }));
+  },
+
+  toggleFavorite: (id) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (sound) get().updateSound(id, { favorite: !sound.favorite });
+  },
+
+  addCategory: (name, color, emoji) => {
+    const cat: Category = { id: nanoid(), name, color, emoji, createdAt: Date.now() };
+    void storage.putCategory(cat);
+    set((st) => ({ categories: [...st.categories, cat] }));
+  },
+
+  deleteCategory: async (id) => {
+    await storage.deleteCategory(id);
+    // Orphaned sounds fall back to "uncategorized".
+    for (const s of get().sounds.filter((s) => s.categoryId === id)) {
+      get().updateSound(s.id, { categoryId: null });
+    }
+    set((st) => ({
+      categories: st.categories.filter((c) => c.id !== id),
+      activeCategory: st.activeCategory === id ? null : st.activeCategory,
+    }));
+  },
+
+  installPack: async (packId) => {
+    const pack = PACKS.find((p) => p.id === packId);
+    if (!pack || get().installedPacks.includes(packId)) return;
+
+    // Reuse an existing category with the pack's name, or create one.
+    let category = get().categories.find((c) => c.name === pack.category);
+    if (!category) {
+      category = { id: nanoid(), name: pack.category, color: pack.color, emoji: pack.emoji, createdAt: Date.now() };
+      await storage.putCategory(category);
+      set((st) => ({ categories: [...st.categories, category!] }));
+    }
+
+    const added: Sound[] = [];
+    for (const def of pack.sounds) {
+      const render = SYNTH_SOUNDS[def.synth];
+      if (!render) continue;
+      const audio = render();
+      const blobKey = nanoid();
+      await storage.putBlob(blobKey, audio);
+      const sound: Sound = {
+        id: nanoid(),
+        title: def.title,
+        subtitle: pack.name,
+        emoji: def.emoji,
+        color: pack.color,
+        categoryId: category.id,
+        tags: def.tags,
+        favorite: false,
+        format: 'wav',
+        duration: 0,
+        waveform: [],
+        playback: { ...DEFAULT_PLAYBACK },
+        playMode: 'oneshot',
+        playCount: 0,
+        lastPlayed: null,
+        createdAt: Date.now() + added.length,
+        blobKey,
+        packId,
+      };
+      await storage.putSound(sound);
+      added.push(sound);
+    }
+
+    const installedPacks = [...get().installedPacks, packId];
+    await storage.setMeta('installedPacks', installedPacks);
+    set((st) => ({ sounds: [...st.sounds, ...added], installedPacks }));
+
+    // Decode the new sounds in the background for instant first play.
+    void (async () => {
+      for (const s of added) {
+        const patch = await ensureLoaded(s);
+        if (patch) {
+          const next = { ...s, ...patch };
+          await storage.putSound(next);
+          set((st) => ({ sounds: st.sounds.map((x) => (x.id === s.id ? next : x)) }));
+        }
+      }
+    })();
+  },
+
+  uninstallPack: async (packId) => {
+    const doomed = get().sounds.filter((s) => s.packId === packId);
+    for (const s of doomed) {
+      audioEngine.stopSound(s.id);
+      audioEngine.unload(s.id);
+      await storage.deleteSound(s.id);
+      await storage.deleteBlob(s.blobKey);
+    }
+    const installedPacks = get().installedPacks.filter((p) => p !== packId);
+    await storage.setMeta('installedPacks', installedPacks);
+    set((st) => ({
+      sounds: st.sounds.filter((s) => s.packId !== packId),
+      queue: st.queue.filter((qid) => !doomed.some((d) => d.id === qid)),
+      installedPacks,
+    }));
+  },
+
+  updateSettings: (patch) => {
+    const settings = { ...get().settings, ...patch };
+    void storage.putSettings(settings);
+    if (patch.theme) {
+      const custom = get().customThemes;
+      applyTheme(patch.theme, custom);
+      void syncStatusBar(isThemeLight(patch.theme, custom));
+    }
+    if (patch.masterVolume !== undefined)
+      audioEngine.setMasterVolume(patch.masterVolume);
+    if (patch.outputDeviceId !== undefined)
+      void audioEngine.setOutputDevice(patch.outputDeviceId);
+    set({ settings });
+  },
+
+  setVoiceVolume: (voiceId, v) => audioEngine.setVoiceVolume(voiceId, v),
+
+  addCustomTheme: (label, tokens) => {
+    const theme: CustomTheme = { id: `custom-${nanoid(6)}`, label, tokens };
+    const customThemes = [...get().customThemes, theme];
+    void storage.setMeta('customThemes', customThemes);
+    set({ customThemes });
+    return theme;
+  },
+
+  updateCustomTheme: (id, patch) => {
+    const customThemes = get().customThemes.map((t) =>
+      t.id === id ? { ...t, ...patch } : t,
+    );
+    void storage.setMeta('customThemes', customThemes);
+    set({ customThemes });
+    // Re-apply live if the edited theme is the active one.
+    if (get().settings.theme === id) applyTheme(id, customThemes);
+  },
+
+  deleteCustomTheme: (id) => {
+    const customThemes = get().customThemes.filter((t) => t.id !== id);
+    void storage.setMeta('customThemes', customThemes);
+    set({ customThemes });
+    // If the deleted theme was active, fall back to a built-in.
+    if (get().settings.theme === id) get().updateSettings({ theme: 'cyberpunk' });
+  },
+
+  setSearch: (search) => set({ search }),
+  setActiveCategory: (activeCategory) => set({ activeCategory }),
+  setFavoritesOnly: (favoritesOnly) => set({ favoritesOnly }),
+  setSort: (sort) => set({ sort }),
+  setEditingSound: (editingSoundId) => set({ editingSoundId }),
+
+  exportBackup: async () => {
+    const { sounds, categories, settings } = get();
+    const withAudio = await Promise.all(
+      sounds.map(async (s) => {
+        const data = await storage.getBlob(s.blobKey);
+        return { ...s, audio: data ? arrayBufferToDataUrl(data) : '' };
+      }),
+    );
+    return {
+      version: 1,
+      exportedAt: Date.now(),
+      settings,
+      categories,
+      sounds: withAudio,
+    };
+  },
+
+  importBackup: async (backup) => {
+    for (const c of backup.categories) await storage.putCategory(c);
+    const restored: Sound[] = [];
+    for (const s of backup.sounds) {
+      const { audio, ...sound } = s;
+      if (audio) {
+        const buf = dataUrlToArrayBuffer(audio);
+        await storage.putBlob(sound.blobKey, buf);
+      }
+      await storage.putSound(sound);
+      restored.push(sound);
+    }
+    get().updateSettings(backup.settings);
+    set((st) => {
+      const map = new Map(st.sounds.map((x) => [x.id, x]));
+      for (const s of restored) map.set(s.id, s);
+      const catMap = new Map(st.categories.map((x) => [x.id, x]));
+      for (const c of backup.categories) catMap.set(c.id, c);
+      return { sounds: [...map.values()], categories: [...catMap.values()] };
+    });
+  },
+
+  exportCsv: () => buildCsv(get().sounds, get().categories),
+
+  exportZipBytes: async () => {
+    const { sounds, categories, settings } = get();
+    const audio: Record<string, Uint8Array> = {};
+    const manifestSounds: ZipManifest['sounds'] = [];
+    for (const s of sounds) {
+      const data = await storage.getBlob(s.blobKey);
+      const file = audioPath(s);
+      if (data) audio[file] = new Uint8Array(data);
+      manifestSounds.push({ ...s, file });
+    }
+    const manifest: ZipManifest = {
+      version: 1,
+      exportedAt: Date.now(),
+      settings,
+      categories,
+      sounds: manifestSounds,
+    };
+    return buildLibraryZip(manifest, audio);
+  },
+
+  importZip: async (bytes) => {
+    const { manifest, audio } = parseLibraryZip(bytes);
+    for (const c of manifest.categories) await storage.putCategory(c);
+    const restored: Sound[] = [];
+    for (const entry of manifest.sounds) {
+      const { file, ...sound } = entry;
+      const data = audio[file];
+      if (data) {
+        // Copy into a fresh ArrayBuffer so the stored blob owns its bytes.
+        await storage.putBlob(sound.blobKey, data.slice().buffer);
+      }
+      await storage.putSound(sound);
+      restored.push(sound);
+    }
+    get().updateSettings(manifest.settings);
+    set((st) => {
+      const map = new Map(st.sounds.map((x) => [x.id, x]));
+      for (const s of restored) map.set(s.id, s);
+      const catMap = new Map(st.categories.map((x) => [x.id, x]));
+      for (const c of manifest.categories) catMap.set(c.id, c);
+      return { sounds: [...map.values()], categories: [...catMap.values()] };
+    });
+  },
+
+  createBackupSnapshot: async (auto, label) => {
+    const backup = await get().exportBackup();
+    const id = `${backup.exportedAt}-${nanoid(4)}`;
+    await storage.putBackup(id, backup);
+    const summary = summarize(id, backup, auto, label);
+    // Keep the newest few auto-backups; manual ones are always retained.
+    const { kept, removed } = pruneBackups([...get().backups, summary], 5);
+    for (const rid of removed) await storage.deleteBackup(rid);
+    await storage.setMeta('backupIndex', kept);
+    set({ backups: kept });
+  },
+
+  restoreBackup: async (id) => {
+    const backup = await storage.getBackup(id);
+    if (backup) await get().importBackup(backup);
+  },
+
+  removeBackup: async (id) => {
+    await storage.deleteBackup(id);
+    const backups = get().backups.filter((b) => b.id !== id);
+    await storage.setMeta('backupIndex', backups);
+    set({ backups });
+  },
+
+  visibleSounds: () => {
+    const { sounds, search, activeCategory, favoritesOnly, sort, categories } = get();
+    const q = search.trim().toLowerCase();
+    const catName = (id: string | null) =>
+      categories.find((c) => c.id === id)?.name.toLowerCase() ?? '';
+
+    let list = sounds.filter((s) => {
+      if (favoritesOnly && !s.favorite) return false;
+      if (activeCategory && s.categoryId !== activeCategory) return false;
+      if (!q) return true;
+      return (
+        s.title.toLowerCase().includes(q) ||
+        (s.subtitle?.toLowerCase().includes(q) ?? false) ||
+        s.tags.some((t) => t.toLowerCase().includes(q)) ||
+        catName(s.categoryId).includes(q)
+      );
+    });
+
+    const sorters: Record<SortKey, (a: Sound, b: Sound) => number> = {
+      recent: (a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0),
+      name: (a, b) => a.title.localeCompare(b.title),
+      played: (a, b) => b.playCount - a.playCount,
+      created: (a, b) => b.createdAt - a.createdAt,
+    };
+    list = [...list].sort(sorters[sort]);
+    // Favorites always pinned to the top.
+    return list.sort((a, b) => Number(b.favorite) - Number(a.favorite));
+  },
+}));
+
+/** Immutably move an array item from `from` to `to`, clamping out-of-range. */
+export function moveItem<T>(arr: T[], from: number, to: number): T[] {
+  if (from < 0 || from >= arr.length || to < 0 || to >= arr.length || from === to)
+    return arr;
+  const copy = [...arr];
+  const [item] = copy.splice(from, 1);
+  copy.splice(to, 0, item as T);
+  return copy;
+}
+
+const PALETTE = [
+  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
+  '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7',
+  '#d946ef', '#ec4899', '#f43f5e',
+];
+export function pickColor(i: number): string {
+  return PALETTE[i % PALETTE.length]!;
+}
+export { PALETTE };
