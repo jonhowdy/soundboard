@@ -1,15 +1,17 @@
 # Testing strategy
 
 A classic pyramid: many fast unit tests, a layer of integration tests around the
-store, and an end-to-end layer that drives the real browser. **59 unit/integration
-tests (Vitest) + 13 end-to-end tests (Playwright), all green.**
+store, and an end-to-end layer that drives the real browser. **61 unit/integration
+tests (Vitest) + 14 end-to-end tests (Playwright), all green.** `npm run lint`
+(ESLint, zero warnings) and `tsc --noEmit` (which also covers `e2e/` and the
+Playwright config) round out the static gates.
 
 ## Tooling
 - **Vitest** (jsdom) — unit + integration, `npm test`.
 - **@testing-library/react** — component tests (render, query by role/label).
 - **Playwright** — e2e against the production preview, `npm run e2e`.
 
-## What's covered today (`src/test`, 59 tests, all green)
+## What's covered today (`src/test`, 61 tests, all green)
 
 | Suite | Layer | Verifies |
 |-------|-------|----------|
@@ -24,6 +26,7 @@ tests (Vitest) + 13 end-to-end tests (Playwright), all green.**
 | `packs.test.ts` | unit | Catalog integrity (unique ids, real synth keys, required fields) + valid WAV render for every pack sound |
 | `backup.test.ts` | unit | ZIP round-trip (manifest + audio), CSV header/escaping, backup pruning (auto cap, manual retention) |
 | `themes.test.ts` | unit | hex↔triple round-trip, `resolveTokens` (built-in/custom/fallback), light-vs-dark detection |
+| `modal.test.tsx` | component | Modal stacking: Escape closes only the topmost modal; `hasOpenModal` tracks open state |
 | `store.filter.test.ts` | integration | `visibleSounds` search across title/tag/category, category & favorites filters, sort, favorite pinning |
 
 Run: `npm test` · watch: `npm run test:watch` · UI: `npm run test:ui`.
@@ -47,7 +50,7 @@ Run: `npm test` · watch: `npm run test:watch` · UI: `npm run test:ui`.
 - **Audio engine with a mocked AudioContext**: assert graph wiring, fade ramps
   scheduled, `stopAll` disconnects, reversed-buffer caching.
 
-## End-to-end (Playwright) — `e2e/`, 12 tests, all green
+## End-to-end (Playwright) — `e2e/`, 14 tests, all green
 
 Run against a production build served by `vite preview` (config in
 `playwright.config.ts`, `npm run e2e`). Every major user flow is covered:
@@ -60,7 +63,7 @@ Run against a production build served by `vite preview` (config in
 | `packs.spec.ts` | Install a pack (library 12 → 18); "Installed" badge; remove reverts |
 | `backup.spec.ts` | Auto-daily backup present on load; manual backup adds a version; CSV **download**; restore |
 | `editor.spec.ts` | Right-click → editor; AI auto-style; **trim & apply**; theme switch updates `data-theme` |
-| `themes.spec.ts` | Create a custom theme (name + accent), apply it (`data-theme=custom-*`), see its swatch |
+| `themes.spec.ts` | Create a custom theme (name + accent), apply it (`data-theme=custom-*`), see its swatch; large-text mode survives a reload (waits for the IndexedDB write before reloading) |
 
 Playwright uses web-first (auto-retrying) assertions, and each test runs in a
 fresh browser context so IndexedDB starts empty and the board re-seeds
@@ -72,7 +75,7 @@ deterministically.
 
 ## CI gate
 `.github/workflows/ci.yml` runs three jobs on every push/PR:
-1. **build-and-test** — typecheck → unit/integration (Vitest) → production build → upload web build.
+1. **build-and-test** — lint → typecheck → unit/integration (Vitest) → production build → upload web build.
 2. **e2e** — install Chromium → Playwright suite → upload the HTML report.
 3. **desktop** — install WebKitGTK deps → `cargo build` the Tauri app.
 

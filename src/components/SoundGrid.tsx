@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store/useStore';
 import { SoundButton } from './SoundButton';
 import { AddSoundTile } from './AddSoundTile';
@@ -15,7 +16,9 @@ const COLS: Record<GridSize, string> = {
 };
 
 export function SoundGrid() {
-  const visible = useStore((s) => s.visibleSounds());
+  // visibleSounds() builds a fresh array per call; shallow-compare its items so
+  // unrelated store churn (e.g. live mixer voices) doesn't re-render the grid.
+  const visible = useStore(useShallow((s) => s.visibleSounds()));
   const gridSize = useStore((s) => s.settings.gridSize);
   // Filter/sort inputs form a signature; when they change we jump back to page 1.
   const search = useStore((s) => s.search);

@@ -1,5 +1,17 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import clsx from 'clsx';
+
+/**
+ * Stack of currently-open modals (outermost first). Escape must close only the
+ * topmost modal — without this, nested modals (e.g. the trim editor inside the
+ * sound editor) would all close on a single keypress.
+ */
+const modalStack: symbol[] = [];
+
+/** True while any modal is open (used to suppress global Escape = stop-all). */
+export function hasOpenModal(): boolean {
+  return modalStack.length > 0;
+}
 
 /** Accessible modal with backdrop, Escape-to-close and focus containment. */
 export function Modal({
@@ -15,13 +27,24 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const tokenRef = useRef<symbol>();
+  if (!tokenRef.current) tokenRef.current = Symbol('modal');
+
   useEffect(() => {
     if (!open) return;
+    const token = tokenRef.current!;
+    modalStack.push(token);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && modalStack[modalStack.length - 1] === token) {
+        onClose();
+      }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      const idx = modalStack.indexOf(token);
+      if (idx !== -1) modalStack.splice(idx, 1);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [open, onClose]);
 
   if (!open) return null;

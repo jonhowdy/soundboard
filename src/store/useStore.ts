@@ -17,7 +17,7 @@ import type { Pcm } from '../audio/edit';
 import { encodeWav } from '../utils/wav';
 import { hapticTap } from '../platform/haptics';
 import { syncStatusBar } from '../platform/native';
-import { applyTheme, isThemeLight } from '../themes/themes';
+import { applyTheme, applyAccessibility, isThemeLight } from '../themes/themes';
 import { buildSeed } from '../data/seed';
 import { PACKS } from '../data/packs';
 import { SYNTH_SOUNDS } from '../utils/synth';
@@ -163,6 +163,7 @@ export const useStore = create<State>((set, get) => ({
     settings = { ...DEFAULT_SETTINGS, ...settings };
     const customThemes = (await storage.getMeta<CustomTheme[]>('customThemes')) ?? [];
     applyTheme(settings.theme, customThemes);
+    applyAccessibility(settings);
     audioEngine.setMasterVolume(settings.masterVolume);
     if (settings.outputDeviceId) void audioEngine.setOutputDevice(settings.outputDeviceId);
 
@@ -290,10 +291,12 @@ export const useStore = create<State>((set, get) => ({
       };
       void storage.putSound(next);
       set((s) => ({ sounds: s.sounds.map((x) => (x.id === id ? next : x)) }));
-      audioEngine.play(id, sound.playback, { title: sound.title }, {
+      const voiceId = audioEngine.play(id, sound.playback, { title: sound.title }, {
         forceNoLoop: true,
         onEnded: () => void step(i + 1),
       });
+      // An unplayable sound (failed decode) must not stall the queue.
+      if (!voiceId) void step(i + 1);
     };
     void step(0);
   },
@@ -584,6 +587,13 @@ export const useStore = create<State>((set, get) => ({
       audioEngine.setMasterVolume(patch.masterVolume);
     if (patch.outputDeviceId !== undefined)
       void audioEngine.setOutputDevice(patch.outputDeviceId);
+    if (
+      patch.largeText !== undefined ||
+      patch.highContrast !== undefined ||
+      patch.colorBlindMode !== undefined
+    ) {
+      applyAccessibility(settings);
+    }
     set({ settings });
   },
 

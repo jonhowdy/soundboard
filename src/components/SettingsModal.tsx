@@ -82,26 +82,17 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           <Toggle
             label="Large text"
             checked={settings.largeText}
-            onChange={(v) => {
-              update({ largeText: v });
-              document.documentElement.toggleAttribute('data-large-text', v);
-            }}
+            onChange={(v) => update({ largeText: v })}
           />
           <Toggle
             label="High contrast"
             checked={settings.highContrast}
-            onChange={(v) => {
-              update({ highContrast: v });
-              document.documentElement.toggleAttribute('data-high-contrast', v);
-            }}
+            onChange={(v) => update({ highContrast: v })}
           />
           <Toggle
             label="Color-blind friendly"
             checked={settings.colorBlindMode}
-            onChange={(v) => {
-              update({ colorBlindMode: v });
-              document.documentElement.toggleAttribute('data-color-blind', v);
-            }}
+            onChange={(v) => update({ colorBlindMode: v })}
           />
         </section>
 

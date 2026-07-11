@@ -12,7 +12,10 @@ export function RecordModal({ open, onClose }: { open: boolean; onClose: () => v
 
   const reset = () => {
     setTitle('');
-    setPreview(null);
+    setPreview((url) => {
+      if (url) URL.revokeObjectURL(url);
+      return null;
+    });
     setBlob(null);
   };
 
@@ -20,7 +23,10 @@ export function RecordModal({ open, onClose }: { open: boolean; onClose: () => v
     const b = await rec.stop();
     if (b) {
       setBlob(b);
-      setPreview(URL.createObjectURL(b));
+      setPreview((url) => {
+        if (url) URL.revokeObjectURL(url);
+        return URL.createObjectURL(b);
+      });
     }
   };
 

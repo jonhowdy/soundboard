@@ -13,7 +13,7 @@ design languages.
 > desktop shell** (`src-tauri/`) **compiles to a native binary**, adding OS-level
 > global hotkeys and audio-output routing; the **Capacitor mobile shell** wraps
 > the same codebase with native haptics, status-bar theming and safe-area
-> handling. Locked down by **59 unit + 13 end-to-end tests, all green in CI**. See
+> handling. Locked down by **61 unit + 14 end-to-end tests plus lint, all green in CI**. See
 > the [roadmap](docs/ROADMAP.md), [desktop](docs/DESKTOP.md), [mobile](docs/MOBILE.md),
 > [testing](docs/TESTING.md) and [deployment](docs/DEPLOYMENT.md) guides.
 

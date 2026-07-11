@@ -132,6 +132,22 @@ export function isThemeLight(id: string, custom: CustomTheme[] = []): boolean {
   return isTokensLight(resolveTokens(id, custom));
 }
 
+/**
+ * Mirror accessibility settings onto <html> data-attributes (consumed by
+ * index.css). Must run on init as well as on toggle, so persisted settings
+ * survive a reload.
+ */
+export function applyAccessibility(opts: {
+  largeText: boolean;
+  highContrast: boolean;
+  colorBlindMode: boolean;
+}): void {
+  const root = document.documentElement;
+  root.toggleAttribute('data-large-text', opts.largeText);
+  root.toggleAttribute('data-high-contrast', opts.highContrast);
+  root.toggleAttribute('data-color-blind', opts.colorBlindMode);
+}
+
 // --- hex <-> "R G B" triple conversion for the color-picker UI -----------------
 
 export function tripleToHex(triple: string): string {

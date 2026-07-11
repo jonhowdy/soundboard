@@ -37,9 +37,24 @@ green (typecheck + unit/integration + e2e + production build) — see
   one-tap restore; ZIP (manifest + raw audio), JSON and CSV export; JSON/ZIP import.
 - **Custom themes (M7).** Theme editor over the eight color tokens with a live
   preview; custom themes persist and sit alongside built-ins in the picker.
-- **Testing & CI.** 59 Vitest unit/integration tests and 13 Playwright end-to-end
-  tests. CI runs three jobs on every push/PR: build+unit, e2e, and a native
-  desktop `cargo build`.
+- **Testing & CI.** 61 Vitest unit/integration tests and 14 Playwright end-to-end
+  tests, plus ESLint. CI runs three jobs on every push/PR: lint+build+unit, e2e,
+  and a native desktop `cargo build`.
+
+### Fixed
+
+- Accessibility modes (large text, high contrast, color-blind) are re-applied on
+  app launch, so persisted settings survive a reload.
+- Escape now closes only the topmost modal in nested-modal situations (e.g. the
+  trim editor inside the sound editor) and no longer also stops playback while a
+  modal is open.
+- Queue playback skips an unplayable sound instead of stalling.
+- The recorder revokes stale audio preview URLs (memory leak on re-record).
+- `npm run lint` actually works — ESLint and its plugins are installed and the
+  whole codebase passes with zero warnings; `tsc --noEmit` now also covers the
+  e2e suite and Playwright config.
+- The sound grid no longer re-renders on unrelated store changes (live mixer
+  voice churn) thanks to a shallow-compared selector.
 
 ### Notes
 

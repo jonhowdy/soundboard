@@ -138,12 +138,14 @@ export function SoundEditor() {
                   key={c}
                   onClick={() => patch({ color: c })}
                   aria-label={`Color ${c}`}
-                  className="h-7 w-7 rounded-full ring-2 ring-offset-2 ring-offset-panel transition-transform hover:scale-110"
-                  style={{
-                    backgroundColor: c,
-                    // eslint-disable-next-line
-                    ...(sound.color === c ? { boxShadow: `0 0 0 2px ${c}` } : {}),
-                  }}
+                  aria-pressed={sound.color === c}
+                  className={
+                    'h-7 w-7 rounded-full transition-transform hover:scale-110 ' +
+                    (sound.color === c
+                      ? 'ring-2 ring-ink ring-offset-2 ring-offset-panel'
+                      : '')
+                  }
+                  style={{ backgroundColor: c }}
                 />
               ))}
             </div>

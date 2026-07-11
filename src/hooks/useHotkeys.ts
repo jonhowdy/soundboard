@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { isTauri } from '../platform';
+import { hasOpenModal } from '../components/ui';
 
 /** Serialize a KeyboardEvent into the canonical combo string used for hotkeys. */
 export function comboFromEvent(e: KeyboardEvent | React.KeyboardEvent): string {
@@ -37,7 +38,9 @@ export function useHotkeys(): void {
       }
 
       if (e.key === 'Escape') {
-        stopAll();
+        // With a modal open, Escape is "close the modal" (handled by Modal),
+        // not "stop all playback".
+        if (!hasOpenModal()) stopAll();
         return;
       }
 
